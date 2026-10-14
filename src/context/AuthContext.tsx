@@ -16,6 +16,7 @@ interface AuthContextType {
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | Error | null }>;
+  signInWithGoogle: (redirectTo?: string) => Promise<{ error: AuthError | Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: AuthError | Error | null }>;
   refreshProfile: () => Promise<void>;
@@ -162,6 +163,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
+  const signInWithGoogle = async (customRedirectTo?: string) => {
+    if (!isSupabaseConfigured) {
+      // Dev mode fallback: log in as student applicant
+      devSignIn('applicant');
+      return { error: null };
+    }
+
+    const defaultRedirect = `${window.location.origin}/`;
+    const targetRedirect = customRedirectTo || defaultRedirect;
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: targetRedirect,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    });
+
+    return { error };
+  };
+
   const signOut = async () => {
     if (isSupabaseConfigured) {
       await supabase.auth.signOut();
@@ -273,6 +298,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isConfigured: isSupabaseConfigured,
         signIn,
         signUp,
+        signInWithGoogle,
         signOut,
         resetPassword,
         refreshProfile,
