@@ -37,13 +37,31 @@ describe('Public Website Academic Sections', () => {
     expect(screen.getByText(/Dr. Amjad Iqbal/i)).toBeInTheDocument();
     expect(screen.getByText(/Adil Khan/i)).toBeInTheDocument();
     expect(screen.getByText(/Saleem Jan/i)).toBeInTheDocument();
-    expect(screen.getByText(/Waqar Younas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Eshaal Khan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Hadia Zahoor/i)).toBeInTheDocument();
     expect(screen.getByText(/Irshad Ahmad/i)).toBeInTheDocument();
+    expect(screen.getByText(/Yusra Panezai/i)).toBeInTheDocument();
+    expect(screen.getByText(/Waqar Younas/i)).toBeInTheDocument();
 
     // Verify verified email contact links
     expect(screen.getByLabelText(/Email Adil Khan/i)).toHaveAttribute('href', 'mailto:adilmusawir@gmail.com');
     expect(screen.getByLabelText(/Email Saleem Jan/i)).toHaveAttribute('href', 'mailto:sj3463586@gmail.com');
+    expect(screen.getByLabelText(/Email Eshaal Khan/i)).toHaveAttribute('href', 'mailto:eshaal.smc@student.edu.pk');
     expect(screen.getByLabelText(/Email Irshad Ahmad/i)).toHaveAttribute('href', 'mailto:irshadahmad.access@gmail.com');
+  });
+
+  it('renders Eshaal Khan before Hadia Zahoor and Yusra Panezai in the executive lineup', () => {
+    const { container } = render(<LeadershipSection />);
+    const textContent = container.textContent || '';
+    const eshaalPos = textContent.indexOf('Eshaal Khan');
+    const hadiaPos = textContent.indexOf('Hadia Zahoor');
+    const yusraPos = textContent.indexOf('Yusra Panezai');
+
+    expect(eshaalPos).toBeGreaterThan(-1);
+    expect(hadiaPos).toBeGreaterThan(-1);
+    expect(yusraPos).toBeGreaterThan(-1);
+    expect(eshaalPos).toBeLessThan(hadiaPos);
+    expect(eshaalPos).toBeLessThan(yusraPos);
   });
 
   it('renders events section with clean empty state when no upcoming events exist', () => {

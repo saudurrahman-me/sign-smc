@@ -24,12 +24,14 @@ export const LeadershipSection: React.FC = () => {
           const combined = [...published, ...missingDefaults].map((p) => {
             const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) =>
+                f.id === p.id ||
                 f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
                 (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
             if (match) {
               return {
                 ...p,
+                display_order: match.display_order,
                 bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
                 academic_year: p.academic_year || match.academic_year,
                 photo_url: p.photo_url || match.photo_url,
@@ -66,20 +68,19 @@ export const LeadershipSection: React.FC = () => {
           const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
             (init) => !existingNames.has(init.full_name.toLowerCase())
           );
-          const combined = [...fetched, ...missingDefaults].sort(
-            (a, b) => a.display_order - b.display_order
-          );
+          const combined = [...fetched, ...missingDefaults];
 
           const merged = combined.map((p) => {
             const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) =>
-                f.display_order === p.display_order ||
+                f.id === p.id ||
                 f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
                 (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
             if (fallbackMatch) {
               return {
                 ...p,
+                display_order: fallbackMatch.display_order,
                 bio:
                   p.bio &&
                   p.bio.trim().length > 15 &&
@@ -94,7 +95,7 @@ export const LeadershipSection: React.FC = () => {
             }
             return p;
           });
-          setProfiles(merged);
+          setProfiles(merged.sort((a, b) => a.display_order - b.display_order));
         }
       } catch (err) {
         console.error('[SIGN Leadership] Unexpected error:', err);
