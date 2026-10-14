@@ -37,31 +37,50 @@ describe('Public Website Academic Sections', () => {
     expect(screen.getByText(/Dr. Amjad Iqbal/i)).toBeInTheDocument();
     expect(screen.getByText(/Adil Khan/i)).toBeInTheDocument();
     expect(screen.getByText(/Saleem Jan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Irshad Ahmad/i)).toBeInTheDocument();
+    expect(screen.getByText(/Waqar Younas/i)).toBeInTheDocument();
     expect(screen.getByText(/Eshaal Khan/i)).toBeInTheDocument();
     expect(screen.getByText(/Hadia Zahoor/i)).toBeInTheDocument();
-    expect(screen.getByText(/Irshad Ahmad/i)).toBeInTheDocument();
     expect(screen.getByText(/Yusra Panezai/i)).toBeInTheDocument();
-    expect(screen.getByText(/Waqar Younas/i)).toBeInTheDocument();
 
     // Verify verified email contact links
     expect(screen.getByLabelText(/Email Adil Khan/i)).toHaveAttribute('href', 'mailto:adilmusawir@gmail.com');
     expect(screen.getByLabelText(/Email Saleem Jan/i)).toHaveAttribute('href', 'mailto:sj3463586@gmail.com');
-    expect(screen.getByLabelText(/Email Eshaal Khan/i)).toHaveAttribute('href', 'mailto:eshaal.smc@student.edu.pk');
     expect(screen.getByLabelText(/Email Irshad Ahmad/i)).toHaveAttribute('href', 'mailto:irshadahmad.access@gmail.com');
+    expect(screen.getByLabelText(/Email Eshaal Khan/i)).toHaveAttribute('href', 'mailto:eshaal.smc@student.edu.pk');
   });
 
-  it('renders Eshaal Khan before Hadia Zahoor and Yusra Panezai in the executive lineup', () => {
+  it('renders executive lineup with male sequence first followed by girls (Eshaal, Hadia, Yusra)', () => {
     const { container } = render(<LeadershipSection />);
     const textContent = container.textContent || '';
+    const adilPos = textContent.indexOf('Adil Khan');
+    const saleemPos = textContent.indexOf('Saleem Jan');
+    const irshadPos = textContent.indexOf('Irshad Ahmad');
+    const waqarPos = textContent.indexOf('Waqar Younas');
     const eshaalPos = textContent.indexOf('Eshaal Khan');
     const hadiaPos = textContent.indexOf('Hadia Zahoor');
     const yusraPos = textContent.indexOf('Yusra Panezai');
 
+    // All positions found
+    expect(adilPos).toBeGreaterThan(-1);
+    expect(saleemPos).toBeGreaterThan(-1);
+    expect(irshadPos).toBeGreaterThan(-1);
+    expect(waqarPos).toBeGreaterThan(-1);
     expect(eshaalPos).toBeGreaterThan(-1);
     expect(hadiaPos).toBeGreaterThan(-1);
     expect(yusraPos).toBeGreaterThan(-1);
+
+    // Male sequence first: Adil < Saleem < Irshad < Waqar
+    expect(adilPos).toBeLessThan(saleemPos);
+    expect(saleemPos).toBeLessThan(irshadPos);
+    expect(irshadPos).toBeLessThan(waqarPos);
+
+    // All males before girls: Waqar < Eshaal
+    expect(waqarPos).toBeLessThan(eshaalPos);
+
+    // Girls sequence: 1st Eshaal, then Hadia, then Yusra
     expect(eshaalPos).toBeLessThan(hadiaPos);
-    expect(eshaalPos).toBeLessThan(yusraPos);
+    expect(hadiaPos).toBeLessThan(yusraPos);
   });
 
   it('renders events section with clean empty state when no upcoming events exist', () => {
