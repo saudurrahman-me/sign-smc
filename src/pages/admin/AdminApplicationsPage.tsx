@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { resolveStorageViewUrl } from '../../lib/storage-helpers';
+import { resolveStorageViewUrl, extractStoragePath } from '../../lib/storage-helpers';
 import { evaluateMembershipIntake } from '../../lib/membership-schedule';
 import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
 import type { MembershipApplication, ApplicationStatus, SiteSettings } from '../../types/database.types';
@@ -16,6 +16,9 @@ import {
   Eye,
   CalendarDays,
   Sliders,
+  Trash2,
+  HardDrive,
+  Zap,
 } from 'lucide-react';
 
 export const AdminApplicationsPage: React.FC = () => {
@@ -25,6 +28,13 @@ export const AdminApplicationsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | ApplicationStatus>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
+
+  // Storage management state
+  const [isPurgingReceipt, setIsPurgingReceipt] = useState<boolean>(false);
+  const [confirmPurgeId, setConfirmPurgeId] = useState<string | null>(null);
+  const [isBatchPurging, setIsBatchPurging] = useState<boolean>(false);
+  const [confirmBatchPurge, setConfirmBatchPurge] = useState<boolean>(false);
+  const [storageNotice, setStorageNotice] = useState<string | null>(null);
 
   // Selected for review modal
   const [selectedApp, setSelectedApp] = useState<MembershipApplication | null>(null);
@@ -347,6 +357,131 @@ export const AdminApplicationsPage: React.FC = () => {
     }
   };
 
+  const handlePurgeSingleReceipt = async (app: MembershipApplication) => {
+    if (!app || !app.payment_proof_url) return;
+    setIsPurgingReceipt(true);
+
+    try {
+      const filePath = extractStoragePath(app.payment_proof_url);
+      const isDevSession = !isSupabaseConfigured || app.id.startsWith('demo-');
+
+      if (!isDevSession && filePath) {
+        try {
+          const { error: removeError } = await supabase.storage
+            .from('applicant-documents')
+            .remove([filePath]);
+          if (removeError) {
+            console.warn('[SIGN Admin Storage] Storage remove notice:', removeError.message);
+          }
+        } catch (storageErr) {
+          console.warn('[SIGN Admin Storage] Could not remove storage object:', storageErr);
+        }
+
+        const { error: dbError } = await supabase
+          .from('membership_applications')
+          .update({ payment_proof_url: null, updated_at: new Date().toISOString() })
+          .eq('id', app.id);
+
+        if (dbError) throw dbError;
+      }
+
+      // Update local applications state
+      setApplications((prev) =>
+        prev.map((a) => (a.id === app.id ? { ...a, payment_proof_url: null } : a))
+      );
+
+      // Update currently open dossier modal
+      if (selectedApp?.id === app.id) {
+        setSelectedApp((prev) => (prev ? { ...prev, payment_proof_url: null } : null));
+        setResolvedProofUrl('');
+      }
+
+      // Update dev session storage if matching
+      try {
+        const stored = sessionStorage.getItem('sign_user_application');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.id === app.id) {
+            sessionStorage.setItem(
+              'sign_user_application',
+              JSON.stringify({ ...parsed, payment_proof_url: null })
+            );
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      setConfirmPurgeId(null);
+      setStorageNotice(
+        `Receipt screenshot permanently purged from cloud storage for ${app.full_name}. Application record preserved.`
+      );
+      setTimeout(() => setStorageNotice(null), 6000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to purge storage file';
+      alert(`Purge failed: ${msg}`);
+    } finally {
+      setIsPurgingReceipt(false);
+    }
+  };
+
+  const handleBatchPurgeDeclined = async () => {
+    const rejectedWithProof = applications.filter(
+      (a) => a.status === 'rejected' && Boolean(a.payment_proof_url)
+    );
+    if (rejectedWithProof.length === 0) return;
+
+    setIsBatchPurging(true);
+
+    try {
+      const filePaths = rejectedWithProof
+        .map((a) => extractStoragePath(a.payment_proof_url || ''))
+        .filter(Boolean);
+
+      if (isSupabaseConfigured && filePaths.length > 0) {
+        try {
+          await supabase.storage.from('applicant-documents').remove(filePaths);
+        } catch (storageErr) {
+          console.warn('[SIGN Admin Storage] Batch storage remove notice:', storageErr);
+        }
+      }
+
+      const targetIds = rejectedWithProof.map((a) => a.id);
+      const realIds = targetIds.filter((id) => !id.startsWith('demo-'));
+
+      if (isSupabaseConfigured && realIds.length > 0) {
+        const { error: dbError } = await supabase
+          .from('membership_applications')
+          .update({ payment_proof_url: null, updated_at: new Date().toISOString() })
+          .in('id', realIds);
+
+        if (dbError) throw dbError;
+      }
+
+      setApplications((prev) =>
+        prev.map((a) =>
+          targetIds.includes(a.id) ? { ...a, payment_proof_url: null } : a
+        )
+      );
+
+      if (selectedApp && targetIds.includes(selectedApp.id)) {
+        setSelectedApp((prev) => (prev ? { ...prev, payment_proof_url: null } : null));
+        setResolvedProofUrl('');
+      }
+
+      setConfirmBatchPurge(false);
+      setStorageNotice(
+        `Storage reclaimed: Successfully purged ${rejectedWithProof.length} rejected payment receipt(s) from Supabase Storage.`
+      );
+      setTimeout(() => setStorageNotice(null), 7000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to batch purge rejected receipts';
+      alert(`Batch purge failed: ${msg}`);
+    } finally {
+      setIsBatchPurging(false);
+    }
+  };
+
   const statusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -379,6 +514,10 @@ export const AdminApplicationsPage: React.FC = () => {
     }
   };
 
+  const rejectedReceiptsCount = applications.filter(
+    (a) => a.status === 'rejected' && Boolean(a.payment_proof_url)
+  ).length;
+
   const filtered = applications.filter((app) => {
     const matchesSearch =
       app.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -409,6 +548,22 @@ export const AdminApplicationsPage: React.FC = () => {
           <span>{applications.filter((a) => a.status === 'pending').length} Pending Review</span>
         </div>
       </div>
+
+      {/* Storage & Retention Optimization Notice */}
+      {storageNotice && (
+        <div className="p-4 rounded-2xl bg-emerald-950/90 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between gap-3 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>{storageNotice}</span>
+          </div>
+          <button
+            onClick={() => setStorageNotice(null)}
+            className="text-emerald-400 hover:text-white p-1 rounded-lg"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Semester Intake Schedule Status Banner */}
       <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
@@ -454,6 +609,72 @@ export const AdminApplicationsPage: React.FC = () => {
           <Sliders className="w-3.5 h-3.5 text-cyan-400" />
           Adjust Semester Schedule &rarr;
         </Link>
+      </div>
+
+      {/* Storage Control & Retention Management Toolbar */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20 shrink-0">
+            <HardDrive className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white text-sm">Storage Optimization & Retention</span>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-950 text-purple-300 border border-purple-800 flex items-center gap-1">
+                <Zap className="w-3 h-3 text-purple-400" />
+                Auto Image Compression Active
+              </span>
+            </div>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              Applicant screenshots are automatically compressed before upload (~150 KB).{' '}
+              {rejectedReceiptsCount > 0 ? (
+                <span className="text-amber-400 font-medium">
+                  {rejectedReceiptsCount} rejected applicant screenshot{rejectedReceiptsCount > 1 ? 's' : ''} can be purged to reclaim cloud storage.
+                </span>
+              ) : (
+                <span className="text-slate-400">
+                  Storage bucket is clean. No leftover receipts from rejected applicants.
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        {rejectedReceiptsCount > 0 && (
+          confirmBatchPurge ? (
+            <div className="flex items-center gap-2 bg-red-950/60 p-2 rounded-xl border border-red-800 shrink-0">
+              <span className="text-[11px] text-red-200 font-semibold">
+                Purge {rejectedReceiptsCount} rejected file{rejectedReceiptsCount > 1 ? 's' : ''}?
+              </span>
+              <button
+                type="button"
+                onClick={handleBatchPurgeDeclined}
+                disabled={isBatchPurging}
+                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+              >
+                {isBatchPurging ? 'Purging...' : 'Confirm Purge'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmBatchPurge(false)}
+                disabled={isBatchPurging}
+                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300"
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmBatchPurge(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-950/60 hover:bg-red-900/60 text-red-300 border border-red-800 transition-colors shrink-0 cursor-pointer"
+              title="Delete stored payment receipt screenshots for rejected applications to free Supabase Storage"
+            >
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              Purge Rejected Receipts ({rejectedReceiptsCount})
+            </button>
+          )
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -606,8 +827,8 @@ export const AdminApplicationsPage: React.FC = () => {
               </div>
 
               {/* Payment Proof Preview */}
-              {selectedApp.payment_proof_url && (
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+              {selectedApp.payment_proof_url ? (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-400 font-semibold">
                       Easypaisa Membership Fee Proof (Rs. 300)
@@ -687,6 +908,54 @@ export const AdminApplicationsPage: React.FC = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Storage Purge Action */}
+                  <div className="pt-2 border-t border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+                    <span className="text-[11px] text-slate-400">
+                      Cloud Storage Management:
+                    </span>
+                    {confirmPurgeId === selectedApp.id ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-red-300 font-semibold">
+                          Permanently delete file from storage?
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handlePurgeSingleReceipt(selectedApp)}
+                          disabled={isPurgingReceipt}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer"
+                        >
+                          {isPurgingReceipt ? 'Purging...' : 'Yes, Delete'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmPurgeId(null)}
+                          disabled={isPurgingReceipt}
+                          className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmPurgeId(selectedApp.id)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-red-400 hover:text-red-300 hover:bg-red-950/60 border border-red-900/60 transition-colors cursor-pointer"
+                        title="Delete this screenshot from Supabase Storage to free bucket space"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Purge Receipt File (Free Storage)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between text-xs">
+                  <span className="text-slate-400 font-semibold">Easypaisa Fee Proof</span>
+                  <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                    <HardDrive className="w-3.5 h-3.5 text-slate-500" />
+                    Storage Reclaimed: File purged from cloud bucket (Dossier retained)
+                  </span>
                 </div>
               )}
 

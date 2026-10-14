@@ -14,9 +14,12 @@ import {
   Mail,
   Calendar,
   RotateCcw,
+  Zap,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { compressPaymentReceipt, formatBytes } from '../../lib/image-compressor';
 import type { MembershipApplication } from '../../types/database.types';
 import type { IntakeEvaluation } from '../../lib/membership-schedule';
 
@@ -57,6 +60,12 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
   // Payment Proof
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [paymentPreview, setPaymentPreview] = useState<string | null>(null);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [compressionStats, setCompressionStats] = useState<{
+    originalSize: number;
+    compressedSize: number;
+    savedPercentage: number;
+  } | null>(null);
 
   // Previous Experience
   const [previousExperience, setPreviousExperience] = useState<string>('');
@@ -68,22 +77,49 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
 
   if (!isOpen) return null;
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage('File size exceeds 10MB limit. Please upload a smaller image.');
+    if (file.size > 15 * 1024 * 1024) {
+      setErrorMessage('File size exceeds 15MB limit. Please upload a smaller screenshot.');
       return;
     }
 
-    setPaymentFile(file);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPaymentPreview(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsCompressing(true);
     setErrorMessage(null);
+
+    try {
+      if (file.type.startsWith('image/')) {
+        const result = await compressPaymentReceipt(file);
+        setPaymentFile(result.file);
+        setPaymentPreview(result.previewUrl);
+        setCompressionStats({
+          originalSize: result.originalSize,
+          compressedSize: result.compressedSize,
+          savedPercentage: result.savedPercentage,
+        });
+      } else {
+        setPaymentFile(file);
+        setCompressionStats(null);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setPaymentPreview(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.warn('[SIGN Membership] Compression notice:', err);
+      setPaymentFile(file);
+      setCompressionStats(null);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setPaymentPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsCompressing(false);
+    }
   };
 
   const handleClear = () => {
@@ -97,6 +133,7 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
     setOtherGradYear('');
     setPaymentFile(null);
     setPaymentPreview(null);
+    setCompressionStats(null);
     setPreviousExperience('');
     setErrorMessage(null);
   };
@@ -624,33 +661,61 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
                   <strong className="text-slate-900">Make sure the Transaction ID is clearly visible.</strong>
                 </p>
 
-                {paymentPreview ? (
-                  <div className="relative rounded-xl border border-emerald-300 bg-emerald-50/40 p-3 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={paymentPreview}
-                        alt="Payment Proof Receipt"
-                        className="w-16 h-16 rounded-lg object-cover border border-emerald-300 shadow-sm"
-                      />
-                      <div className="min-w-0 text-xs">
-                        <span className="font-bold text-slate-900 block truncate">
-                          {paymentFile?.name || 'Payment Receipt Screenshot'}
-                        </span>
-                        <span className="text-[11px] text-emerald-700 block mt-0.5">
-                          ✓ Payment proof attached
+                {isCompressing ? (
+                  <div className="rounded-xl border border-emerald-300 bg-emerald-50/60 p-6 flex flex-col items-center justify-center gap-2 text-center">
+                    <Loader2 className="w-6 h-6 text-[#016533] animate-spin" />
+                    <span className="text-xs font-bold text-slate-900">
+                      Optimizing payment screenshot...
+                    </span>
+                    <span className="text-[11px] text-slate-600">
+                      Compressing image to save storage and bandwidth while keeping transaction details sharp.
+                    </span>
+                  </div>
+                ) : paymentPreview ? (
+                  <div className="rounded-xl border border-emerald-300 bg-emerald-50/40 p-3.5 space-y-2.5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={paymentPreview}
+                          alt="Payment Proof Receipt"
+                          className="w-16 h-16 rounded-lg object-cover border border-emerald-300 shadow-xs shrink-0"
+                        />
+                        <div className="min-w-0 text-xs">
+                          <span className="font-bold text-slate-900 block truncate">
+                            {paymentFile?.name || 'Payment Receipt Screenshot'}
+                          </span>
+                          <span className="text-[11px] text-emerald-700 font-semibold block mt-0.5">
+                            ✓ Payment proof attached
+                          </span>
+                          {paymentFile && (
+                            <span className="text-[10px] text-slate-500 font-mono block">
+                              Size: {formatBytes(paymentFile.size)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentFile(null);
+                          setPaymentPreview(null);
+                          setCompressionStats(null);
+                        }}
+                        className="text-xs text-red-600 hover:text-red-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors shrink-0"
+                      >
+                        Remove
+                      </button>
+                    </div>
+
+                    {compressionStats && compressionStats.savedPercentage > 0 && (
+                      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-100/70 border border-emerald-200 text-emerald-800 text-[11px]">
+                        <Zap className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>
+                          Compressed: <strong>{formatBytes(compressionStats.originalSize)}</strong> &rarr;{' '}
+                          <strong>{formatBytes(compressionStats.compressedSize)}</strong> ({compressionStats.savedPercentage}% smaller)
                         </span>
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPaymentFile(null);
-                        setPaymentPreview(null);
-                      }}
-                      className="text-xs text-red-600 hover:text-red-800 font-semibold px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
-                    >
-                      Remove
-                    </button>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -661,8 +726,8 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
                       <span className="text-xs font-bold text-slate-800">
                         Click to select payment screenshot
                       </span>
-                      <span className="text-[11px] text-slate-400">
-                        PNG, JPG, or PDF up to 10MB
+                      <span className="text-[11px] text-slate-500">
+                        PNG, JPG, or WebP up to 15MB (automatically optimized)
                       </span>
                       <input
                         type="file"
