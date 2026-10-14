@@ -74,7 +74,22 @@ export const AdminLeadershipPage: React.FC = () => {
       if (error) {
         console.error('[SIGN Admin Leadership] Error:', error.message);
       } else if (data) {
-        setProfiles(data as LeadershipProfile[]);
+        const merged = (data as LeadershipProfile[]).map((p) => {
+          const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
+            (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
+          );
+          if (
+            fallbackMatch &&
+            (!p.bio ||
+              p.bio.startsWith('Patron-in-Chief of the Student') ||
+              p.bio.startsWith('Consultant Neurologist at Saidu') ||
+              p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
+          ) {
+            return { ...p, bio: fallbackMatch.bio };
+          }
+          return p;
+        });
+        setProfiles(merged);
       }
     } catch (err) {
       console.error('[SIGN Admin Leadership] Unexpected error:', err);

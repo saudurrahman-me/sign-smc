@@ -41,7 +41,22 @@ export const LeadershipSection: React.FC = () => {
         if (error) {
           console.error('[SIGN Leadership] Error fetching profiles:', error.message);
         } else if (data && data.length > 0 && isMounted) {
-          setProfiles(data as LeadershipProfile[]);
+          const merged = (data as LeadershipProfile[]).map((p) => {
+            const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
+              (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
+            );
+            if (
+              fallbackMatch &&
+              (!p.bio ||
+                p.bio.startsWith('Patron-in-Chief of the Student') ||
+                p.bio.startsWith('Consultant Neurologist at Saidu') ||
+                p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
+            ) {
+              return { ...p, bio: fallbackMatch.bio };
+            }
+            return p;
+          });
+          setProfiles(merged);
         }
       } catch (err) {
         console.error('[SIGN Leadership] Unexpected error:', err);
