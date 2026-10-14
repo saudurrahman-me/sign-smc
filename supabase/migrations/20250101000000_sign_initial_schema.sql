@@ -53,7 +53,7 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
     id INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     organization_name TEXT NOT NULL DEFAULT 'Student Interest Group in Neurology (SIGN)',
     institution TEXT NOT NULL DEFAULT 'Saidu Medical College (SMC), Swat',
-    affiliation TEXT NOT NULL DEFAULT 'Khyber Medical University (KMU)',
+    affiliation TEXT NOT NULL DEFAULT 'Saidu Medical College (SMC), Swat',
     contact_email TEXT DEFAULT 'signsmc.official@gmail.com',
     contact_phone TEXT,
     address TEXT DEFAULT 'Saidu Medical College, Saidu Sharif, Swat, Khyber Pakhtunkhwa, Pakistan',
@@ -498,7 +498,7 @@ VALUES (
     1,
     'Student Interest Group in Neurology (SIGN)',
     'Saidu Medical College (SMC), Swat',
-    'Khyber Medical University (KMU)',
+    'Saidu Medical College (SMC), Swat',
     'signsmc.official@gmail.com',
     'Saidu Medical College, Saidu Sharif, Swat, Khyber Pakhtunkhwa, Pakistan',
     '{"instagram": "https://www.instagram.com/sign.smc", "facebook": "https://www.facebook.com/signsmc", "linkedin": "", "youtube": ""}'::jsonb,
@@ -513,7 +513,7 @@ VALUES
     'preamble',
     'About SIGN',
     'Preamble & Institutional Foundation',
-    'The Student Interest Group in Neurology (SIGN) Chapter at Saidu Medical College (SMC), Swat, is a student-led academic society established under the auspices of the institution and affiliated with Khyber Medical University (KMU). SIGN exists to nurture a generation of clinically grounded, research-oriented, and socially aware physicians who champion neurological health — at the bedside, in the community, and in the scientific literature.',
+    'The Student Interest Group in Neurology (SIGN) Chapter at Saidu Medical College (SMC), Swat, is a student-led academic society established under the auspices of the institution. SIGN exists to nurture a generation of clinically grounded, research-oriented, and socially aware physicians who champion neurological health — at the bedside, in the community, and in the scientific literature.',
     '{}'::jsonb
 ),
 (

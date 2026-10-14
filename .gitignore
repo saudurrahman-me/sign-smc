@@ -13,6 +13,8 @@ dist
 .env
 .env.*
 !.env.example
+supabase/.temp/
+scripts/audit_supabase.mjs
 
 # Editor directories and files
 .vscode/*
