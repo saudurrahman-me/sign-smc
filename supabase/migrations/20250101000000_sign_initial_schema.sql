@@ -227,7 +227,9 @@ BEGIN
     END IF;
 
     IF (OLD.role IS DISTINCT FROM NEW.role) THEN
-        IF NOT public.is_super_admin() THEN
+        -- Privilege escalation guard: Block only if caller is an authenticated non-super_admin user.
+        -- Direct dashboard admin operations (where auth.uid() IS NULL) and existing Super Admins are permitted.
+        IF (auth.uid() IS NOT NULL) AND NOT public.is_super_admin() THEN
             RAISE EXCEPTION 'Privilege Escalation Blocked: Only super administrators can change user roles.';
         END IF;
 
