@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { resolveStorageViewUrl } from '../../lib/storage-helpers';
-import type { MembershipApplication, ApplicationStatus } from '../../types/database.types';
+import { evaluateMembershipIntake } from '../../lib/membership-schedule';
+import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
+import type { MembershipApplication, ApplicationStatus, SiteSettings } from '../../types/database.types';
 import { useAuth } from '../../context/AuthContext';
 import {
   FileCheck,
@@ -11,6 +14,8 @@ import {
   Clock,
   X,
   Eye,
+  CalendarDays,
+  Sliders,
 } from 'lucide-react';
 
 export const AdminApplicationsPage: React.FC = () => {
@@ -19,6 +24,7 @@ export const AdminApplicationsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<'All' | ApplicationStatus>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
 
   // Selected for review modal
   const [selectedApp, setSelectedApp] = useState<MembershipApplication | null>(null);
@@ -133,7 +139,40 @@ export const AdminApplicationsPage: React.FC = () => {
 
   useEffect(() => {
     fetchApplications();
+
+    // Load site settings (with session cache fallback)
+    const loadSettings = async () => {
+      try {
+        const cached = sessionStorage.getItem('sign_site_settings');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed) setSiteSettings((prev) => ({ ...prev, ...parsed }));
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!isSupabaseConfigured) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (!error && data) {
+          setSiteSettings((prev) => ({ ...prev, ...data }));
+        }
+      } catch (err) {
+        console.warn('[SIGN Admin Applications] Notice loading settings:', err);
+      }
+    };
+
+    loadSettings();
   }, []);
+
+  const intakeEvaluation = evaluateMembershipIntake(siteSettings);
 
   const openReviewModal = async (app: MembershipApplication) => {
     setSelectedApp(app);
@@ -369,6 +408,52 @@ export const AdminApplicationsPage: React.FC = () => {
           <FileCheck className="w-4 h-4 text-purple-400" />
           <span>{applications.filter((a) => a.status === 'pending').length} Pending Review</span>
         </div>
+      </div>
+
+      {/* Semester Intake Schedule Status Banner */}
+      <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div
+            className={`p-2.5 rounded-xl ${
+              intakeEvaluation.isOpen
+                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+            }`}
+          >
+            <CalendarDays className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white text-sm">{intakeEvaluation.termName}</span>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  intakeEvaluation.isOpen
+                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    : 'bg-amber-950 text-amber-300 border border-amber-800'
+                }`}
+              >
+                {intakeEvaluation.badgeText}
+              </span>
+            </div>
+            <p className="text-slate-400 text-[11px] mt-0.5">
+              {intakeEvaluation.isOpen
+                ? `Intake window is currently active and accepting student submissions.${
+                    intakeEvaluation.endDate
+                      ? ` Official Deadline: ${new Date(intakeEvaluation.endDate).toLocaleDateString()}`
+                      : ''
+                  }`
+                : 'Intake is closed. Students see an institutional notice that applications open at the start/end of academic terms.'}
+            </p>
+          </div>
+        </div>
+
+        <Link
+          to="/admin/content"
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shrink-0"
+        >
+          <Sliders className="w-3.5 h-3.5 text-cyan-400" />
+          Adjust Semester Schedule &rarr;
+        </Link>
       </div>
 
       {/* Filter and Search Bar */}

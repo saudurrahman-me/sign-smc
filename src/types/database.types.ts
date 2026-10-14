@@ -40,6 +40,10 @@ export interface SiteSettings {
     twitter?: string;
   };
   membership_open: boolean;
+  membership_term_name?: string | null;
+  membership_start_date?: string | null;
+  membership_end_date?: string | null;
+  membership_closed_message?: string | null;
   membership_form_url?: string | null;
   membership_guidelines: string | null;
   updated_at: string;

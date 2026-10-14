@@ -33,6 +33,11 @@ export const OFFICIAL_SETTINGS: SiteSettings = {
     youtube: '',
   },
   membership_open: true,
+  membership_term_name: 'Fall 2026 Semester Intake',
+  membership_start_date: null,
+  membership_end_date: null,
+  membership_closed_message:
+    'Membership applications for the current academic session are currently closed. The next cohort enrollment will open at the start of the upcoming semester.',
   membership_form_url: OFFICIAL_MEMBERSHIP_FORM_URL,
   membership_guidelines:
     'Membership is open to MBBS students at Saidu Medical College interested in neurology, clinical neuroscience, and student-led academic research.',

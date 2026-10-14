@@ -14,7 +14,9 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { resolveStorageViewUrl } from '../../lib/storage-helpers';
-import type { MembershipApplication } from '../../types/database.types';
+import { evaluateMembershipIntake } from '../../lib/membership-schedule';
+import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
+import type { MembershipApplication, SiteSettings } from '../../types/database.types';
 import { MembershipApplicationModal } from './MembershipApplicationModal';
 import { LoginRequiredModal } from './LoginRequiredModal';
 
@@ -26,6 +28,7 @@ export const MembershipSection: React.FC = () => {
   const [isLoadingApp, setIsLoadingApp] = useState<boolean>(true);
   const [resolvedProofUrl, setResolvedProofUrl] = useState<string>('');
   const [proofLoadError, setProofLoadError] = useState<boolean>(false);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
 
   // Modals state
   const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
@@ -39,6 +42,45 @@ export const MembershipSection: React.FC = () => {
       setIsApplyModalOpen(true);
     }
   }, [location.search, user]);
+
+  // Load site settings (with session cache fallback)
+  useEffect(() => {
+    let isMounted = true;
+    const loadSettings = async () => {
+      try {
+        const cached = sessionStorage.getItem('sign_site_settings');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && isMounted) {
+            setSiteSettings((prev) => ({ ...prev, ...parsed }));
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!isSupabaseConfigured) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('site_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (!error && data && isMounted) {
+          setSiteSettings((prev) => ({ ...prev, ...data }));
+        }
+      } catch (err) {
+        console.warn('[SIGN Membership] Notice loading site settings:', err);
+      }
+    };
+
+    loadSettings();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Load existing user application
   useEffect(() => {
@@ -148,7 +190,15 @@ export const MembershipSection: React.FC = () => {
     }
   };
 
+  const intakeEvaluation = evaluateMembershipIntake(siteSettings);
+
   const handleApplyClick = () => {
+    if (!intakeEvaluation.isOpen) {
+      alert(
+        `Membership applications for ${intakeEvaluation.termName} are currently closed. Next cohort enrollment will open at the start of the semester.`
+      );
+      return;
+    }
     if (!user) {
       setIsLoginModalOpen(true);
     } else {
@@ -295,8 +345,8 @@ export const MembershipSection: React.FC = () => {
               </div>
             </div>
           </div>
-        ) : (
-          /* State 2 & 3: Button view (Unauthenticated or Logged-in without application) */
+        ) : intakeEvaluation.isOpen ? (
+          /* State 2 & 3 (Intake Active): Button view (Unauthenticated or Logged-in without application) */
           <div className="rounded-3xl bg-[#031D12] text-white p-8 sm:p-12 shadow-2xl border border-emerald-900/50 text-center relative overflow-hidden">
             {/* Ambient emerald blur */}
             <div className="absolute -top-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -309,16 +359,15 @@ export const MembershipSection: React.FC = () => {
 
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 border border-emerald-700/50 text-emerald-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Annual Membership Cohort Open
+                {intakeEvaluation.badgeText}
               </span>
 
               <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                Official SIGN SMC Membership
+                {intakeEvaluation.headline}
               </h3>
 
               <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
-                Join our vibrant student community at Saidu Medical College. Get started in medical
-                research, clinical neurology workshops, journal clubs, and student-led scientific publications.
+                {intakeEvaluation.message}
               </p>
 
               {/* Easypaisa Fee Highlight */}
@@ -368,6 +417,73 @@ export const MembershipSection: React.FC = () => {
               </div>
             </div>
           </div>
+        ) : (
+          /* When Intake is CLOSED / PAUSED / UPCOMING */
+          <div className="rounded-3xl bg-slate-900 text-white p-8 sm:p-12 shadow-2xl border border-slate-800 text-center relative overflow-hidden">
+            <div className="max-w-xl mx-auto relative z-10 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
+                <Clock className="w-8 h-8 text-amber-400" />
+              </div>
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-950/80 border border-amber-700/60 text-amber-300">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                {intakeEvaluation.badgeText}
+              </span>
+
+              <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                {intakeEvaluation.headline}
+              </h3>
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+                {intakeEvaluation.message}
+              </p>
+
+              {/* Institutional Enrollment Cycle Card */}
+              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 max-w-md mx-auto text-xs text-slate-300 text-left space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                  <span className="text-slate-400">Academic Intake:</span>
+                  <span className="font-bold text-white">{intakeEvaluation.termName}</span>
+                </div>
+                <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                  <span className="text-slate-400">Intake Policy:</span>
+                  <span className="text-slate-300">Organized at start/end of semesters</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400">Secretariat Email:</span>
+                  <a
+                    href="mailto:signsmc.official@gmail.com"
+                    className="font-mono text-emerald-400 hover:underline"
+                  >
+                    signsmc.official@gmail.com
+                  </a>
+                </div>
+              </div>
+
+              {/* Action Buttons for Closed Period */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  disabled
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-slate-400 bg-slate-800/60 border border-slate-700/60 cursor-not-allowed"
+                >
+                  Applications Paused for Current Session
+                </button>
+
+                <a
+                  href="mailto:signsmc.official@gmail.com?subject=SIGN%20SMC%20Membership%20Inquiry"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/40 hover:bg-emerald-950/80 border border-emerald-800/50 transition-all"
+                >
+                  Contact Executive Board &rarr;
+                </a>
+              </div>
+
+              <div className="mt-8 pt-6 border-t border-slate-800 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400">
+                <span>• Saidu Medical College (SMC)</span>
+                <span>• Official Secretariat: signsmc.official@gmail.com</span>
+                <span>• KMU Affiliated Chapter</span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -378,6 +494,7 @@ export const MembershipSection: React.FC = () => {
         onApplicationSubmitted={(newApp) => {
           setExistingApp(newApp);
         }}
+        intakeEvaluation={intakeEvaluation}
       />
 
       {/* Modal 2: Sign-in Required Prompt for Unauthenticated Visitors */}

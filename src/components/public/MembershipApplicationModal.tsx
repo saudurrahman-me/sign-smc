@@ -18,17 +18,20 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { MembershipApplication } from '../../types/database.types';
+import type { IntakeEvaluation } from '../../lib/membership-schedule';
 
 interface MembershipApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   onApplicationSubmitted?: (app: MembershipApplication) => void;
+  intakeEvaluation?: IntakeEvaluation;
 }
 
 export const MembershipApplicationModal: React.FC<MembershipApplicationModalProps> = ({
   isOpen,
   onClose,
   onApplicationSubmitted,
+  intakeEvaluation,
 }) => {
   const { user, profile } = useAuth();
 
@@ -104,6 +107,13 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
 
     if (!user) {
       setErrorMessage('Authentication required. Please sign in to submit your application.');
+      return;
+    }
+
+    if (intakeEvaluation && !intakeEvaluation.isOpen) {
+      setErrorMessage(
+        `Membership applications for ${intakeEvaluation.termName} are currently closed. New submissions are paused for this academic cycle.`
+      );
       return;
     }
 
@@ -332,6 +342,19 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-6 text-xs sm:text-sm">
+              {/* Intake Closed Warning Notice */}
+              {intakeEvaluation && !intakeEvaluation.isOpen && (
+                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-amber-900 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    Intake Window Notice: Applications Currently Closed ({intakeEvaluation.badgeText})
+                  </div>
+                  <p className="text-amber-800 leading-relaxed text-[11.5px]">
+                    {intakeEvaluation.message} Submissions are temporarily paused until the next scheduled semester cohort.
+                  </p>
+                </div>
+              )}
+
               {/* Card 1: Form Introductory Header */}
               <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-emerald-50/70 via-slate-50 to-emerald-50/30 border border-emerald-200/80 space-y-3">
                 <h3 className="text-base sm:text-lg font-extrabold text-[#016533]">
@@ -688,7 +711,7 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
                   </button>
                   <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isSubmitting || Boolean(intakeEvaluation && !intakeEvaluation.isOpen)}
                     className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/20 disabled:opacity-50 transition-all flex items-center gap-2"
                   >
                     {isSubmitting ? (
@@ -696,6 +719,8 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         Submitting...
                       </>
+                    ) : intakeEvaluation && !intakeEvaluation.isOpen ? (
+                      'Intake Closed'
                     ) : (
                       'Submit'
                     )}
