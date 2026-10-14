@@ -300,15 +300,6 @@ export const AdminLeadershipPage: React.FC = () => {
         </button>
       </div>
 
-      {isDevSession && (
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
-          <span>
-            <strong>Dev Preview Mode Active:</strong> Biographies and profile changes update immediately on your screen and in public preview during this session. To permanently persist updates to the Supabase cloud database, sign in with a registered admin account.
-          </span>
-        </div>
-      )}
-
       {/* Search Bar */}
       <div className="flex items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
         <div className="relative w-full sm:w-80">

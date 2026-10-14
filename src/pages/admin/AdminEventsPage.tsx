@@ -352,15 +352,6 @@ export const AdminEventsPage: React.FC = () => {
         </button>
       </div>
 
-      {isDevSession && (
-        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
-          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
-          <span>
-            <strong>Dev Preview Mode Active:</strong> Events update immediately on your screen and public preview during this session. To permanently persist updates to the Supabase cloud database, sign in with a registered event manager or super admin account.
-          </span>
-        </div>
-      )}
-
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
         <div className="relative w-full sm:w-80">
