@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
+import { compressPaymentReceipt } from '../../lib/image-compressor';
 import type { LeadershipProfile } from '../../types/database.types';
 import { INITIAL_LEADERSHIP_PLACEHOLDERS } from '../../data/fallback-content';
 import {
@@ -15,6 +16,9 @@ import {
   AlertCircle,
   X,
   Mail,
+  Upload,
+  Loader2,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export const AdminLeadershipPage: React.FC = () => {
@@ -42,8 +46,74 @@ export const AdminLeadershipPage: React.FC = () => {
 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState<string | null>(null);
 
   const isDevSession = !isSupabaseConfigured || Boolean(user?.id?.startsWith('dev-'));
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setPhotoUploadError('Image exceeds 15MB limit. Please choose a smaller photo.');
+      return;
+    }
+
+    setIsUploadingPhoto(true);
+    setPhotoUploadError(null);
+
+    try {
+      // Compress to 800x800 square portrait
+      const compressed = await compressPaymentReceipt(file, 800, 800, 0.85);
+
+      if (!isSupabaseConfigured || user?.id?.startsWith('dev-')) {
+        // Dev / local mode: use data URL directly
+        setPhotoUrl(compressed.previewUrl);
+        return;
+      }
+
+      // Upload to Supabase Storage in 'leadership-portraits' bucket
+      const fileExt = compressed.file.name.split('.').pop() || 'jpg';
+      const fileName = `portrait_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const filePath = `officers/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('leadership-portraits')
+        .upload(filePath, compressed.file, {
+          upsert: true,
+          contentType: compressed.file.type || 'image/jpeg',
+        });
+
+      if (uploadError) {
+        console.warn('[SIGN Leadership] Storage upload warning:', uploadError.message);
+        // Fallback to data URL so the photo is retained
+        setPhotoUrl(compressed.previewUrl);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('leadership-portraits')
+        .getPublicUrl(filePath);
+
+      if (publicUrlData?.publicUrl) {
+        setPhotoUrl(publicUrlData.publicUrl);
+      } else {
+        setPhotoUrl(compressed.previewUrl);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Photo upload failed';
+      setPhotoUploadError(msg);
+    } finally {
+      setIsUploadingPhoto(false);
+      e.target.value = '';
+    }
+  };
 
   const fetchProfiles = async () => {
     setIsLoading(true);
@@ -125,6 +195,8 @@ export const AdminLeadershipPage: React.FC = () => {
     setDisplayOrder(profiles.length + 1);
     setIsPublished(true);
     setFormError(null);
+    setPhotoUploadError(null);
+    setIsUploadingPhoto(false);
     setIsModalOpen(true);
   };
 
@@ -142,6 +214,8 @@ export const AdminLeadershipPage: React.FC = () => {
     setDisplayOrder(p.display_order);
     setIsPublished(p.is_published);
     setFormError(null);
+    setPhotoUploadError(null);
+    setIsUploadingPhoto(false);
     setIsModalOpen(true);
   };
 
@@ -552,32 +626,97 @@ export const AdminLeadershipPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Portrait Photograph URL
+              {/* Executive Portrait Photograph (Direct Upload or URL) */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-300 font-semibold text-xs sm:text-sm">
+                    Executive Portrait Photograph
                   </label>
-                  <input
-                    type="text"
-                    value={photoUrl}
-                    onChange={(e) => setPhotoUrl(e.target.value)}
-                    placeholder="/leadership/... or https://... image URL"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
+                  {photoUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setPhotoUrl('')}
+                      className="text-xs text-red-400 hover:text-red-300 font-medium cursor-pointer"
+                    >
+                      Remove Photo
+                    </button>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Public Contact Email (Optional)
-                  </label>
-                  <input
-                    type="email"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    placeholder="officer@smc.edu.pk"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
+                <div className="flex flex-col sm:flex-row items-center gap-4">
+                  {/* Avatar Preview */}
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden bg-slate-900 border-2 border-slate-800 shrink-0 flex items-center justify-center shadow-md">
+                    {photoUrl ? (
+                      <img
+                        src={photoUrl}
+                        alt="Portrait preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <User className="w-8 h-8 text-slate-600" />
+                    )}
+                    {isUploadingPhoto && (
+                      <div className="absolute inset-0 bg-black/70 flex items-center justify-center">
+                        <Loader2 className="w-5 h-5 text-teal-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Actions: Upload from Device or Paste Link */}
+                  <div className="flex-1 space-y-2 w-full">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500/15 hover:bg-teal-500/25 text-teal-300 border border-teal-500/30 cursor-pointer transition-colors">
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>{isUploadingPhoto ? 'Compressing & Uploading...' : 'Upload Photo from Device'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoUpload}
+                          disabled={isUploadingPhoto}
+                          className="hidden"
+                        />
+                      </label>
+                      <span className="text-[11px] text-slate-500">
+                        PNG, JPG, or WebP (auto-compressed to ~100KB)
+                      </span>
+                    </div>
+
+                    <div className="relative">
+                      <LinkIcon className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        value={photoUrl}
+                        onChange={(e) => setPhotoUrl(e.target.value)}
+                        placeholder="Or paste image link (e.g. https://... or /assets/...)"
+                        className="w-full pl-8 pr-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500"
+                      />
+                    </div>
+
+                    {photoUploadError && (
+                      <p className="text-[11px] text-red-400 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5" />
+                        {photoUploadError}
+                      </p>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              {/* Public Contact Email */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs sm:text-sm">
+                  Public Contact Email (Optional)
+                </label>
+                <input
+                  type="email"
+                  value={contactEmail}
+                  onChange={(e) => setContactEmail(e.target.value)}
+                  placeholder="officer@smc.edu.pk"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
