@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { resolveStorageViewUrl } from '../../lib/storage-helpers';
 import type { MembershipApplication, ApplicationStatus } from '../../types/database.types';
 import { useAuth } from '../../context/AuthContext';
 import {
@@ -23,6 +24,10 @@ export const AdminApplicationsPage: React.FC = () => {
   const [selectedApp, setSelectedApp] = useState<MembershipApplication | null>(null);
   const [reviewerNotes, setReviewerNotes] = useState('');
   const [isDeciding, setIsDeciding] = useState(false);
+  const [resolvedProofUrl, setResolvedProofUrl] = useState<string>('');
+  const [isResolvingProof, setIsResolvingProof] = useState<boolean>(false);
+  const [proofImageError, setProofImageError] = useState<boolean>(false);
+  const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
 
   const DEMO_APPLICATIONS: MembershipApplication[] = [
     {
@@ -130,9 +135,40 @@ export const AdminApplicationsPage: React.FC = () => {
     fetchApplications();
   }, []);
 
-  const openReviewModal = (app: MembershipApplication) => {
+  const openReviewModal = async (app: MembershipApplication) => {
     setSelectedApp(app);
     setReviewerNotes(app.reviewer_notes || '');
+    setProofImageError(false);
+    setIsLightboxOpen(false);
+
+    if (app.payment_proof_url) {
+      setIsResolvingProof(true);
+      try {
+        const url = await resolveStorageViewUrl(app.payment_proof_url);
+        setResolvedProofUrl(url);
+      } catch {
+        setResolvedProofUrl(app.payment_proof_url);
+      } finally {
+        setIsResolvingProof(false);
+      }
+    } else {
+      setResolvedProofUrl('');
+      setIsResolvingProof(false);
+    }
+  };
+
+  const handleRetryProofResolution = async () => {
+    if (!selectedApp?.payment_proof_url) return;
+    setIsResolvingProof(true);
+    setProofImageError(false);
+    try {
+      const url = await resolveStorageViewUrl(selectedApp.payment_proof_url, 'applicant-documents', 7200);
+      setResolvedProofUrl(url);
+    } catch {
+      // keep fallback
+    } finally {
+      setIsResolvingProof(false);
+    }
   };
 
   const handleDecision = async (newStatus: 'approved' | 'rejected') => {
@@ -495,23 +531,77 @@ export const AdminApplicationsPage: React.FC = () => {
                       Payment Screenshot Attached
                     </span>
                   </div>
-                  <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900/50 p-2">
-                    <a
-                      href={selectedApp.payment_proof_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block group relative"
-                    >
-                      <img
-                        src={selectedApp.payment_proof_url}
-                        alt="Easypaisa Payment Proof"
-                        className="max-h-56 mx-auto rounded-lg object-contain bg-black/40 group-hover:opacity-90 transition-opacity"
-                      />
-                      <span className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold block text-center mt-2 underline">
-                        Open Full Screenshot in New Tab &rarr;
-                      </span>
-                    </a>
-                  </div>
+
+                  {isResolvingProof ? (
+                    <div className="flex items-center justify-center p-8 bg-slate-900/50 rounded-xl border border-slate-800 text-slate-400 gap-2">
+                      <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xs">Resolving secure proof view...</span>
+                    </div>
+                  ) : proofImageError ? (
+                    <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800/60 text-center space-y-3">
+                      <div className="flex items-center justify-center gap-2 text-amber-300 font-semibold text-xs">
+                        <AlertCircle className="w-4 h-4 text-amber-400" />
+                        Storage Access Notice (Private Bucket or Missing Public Policy)
+                      </div>
+                      <p className="text-[11px] text-amber-200/80 max-w-md mx-auto leading-relaxed">
+                        The screenshot URL could not be rendered directly. In Supabase, if the <code className="bg-amber-900/60 px-1 py-0.5 rounded text-amber-100 font-mono">applicant-documents</code> storage bucket is set to private, direct unauthenticated access is blocked.
+                      </p>
+                      <div className="flex items-center justify-center gap-2 flex-wrap pt-1">
+                        <button
+                          type="button"
+                          onClick={handleRetryProofResolution}
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 border border-amber-500/40 cursor-pointer"
+                        >
+                          Retry with Signed Session Token
+                        </button>
+                        <a
+                          href={resolvedProofUrl || selectedApp.payment_proof_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        >
+                          Open Direct URL &rarr;
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900/50 p-2">
+                      <div
+                        onClick={() => setIsLightboxOpen(true)}
+                        className="cursor-zoom-in group relative"
+                        title="Click to zoom screenshot"
+                      >
+                        <img
+                          src={resolvedProofUrl || selectedApp.payment_proof_url}
+                          alt="Easypaisa Payment Proof"
+                          onError={() => setProofImageError(true)}
+                          className="max-h-60 mx-auto rounded-lg object-contain bg-black/40 group-hover:opacity-95 transition-opacity"
+                        />
+                        <div className="text-center mt-2 flex items-center justify-center gap-3">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsLightboxOpen(true);
+                            }}
+                            className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold underline cursor-pointer"
+                          >
+                            Click to Expand In-App &rarr;
+                          </button>
+                          <span className="text-slate-600">•</span>
+                          <a
+                            href={resolvedProofUrl || selectedApp.payment_proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold underline"
+                          >
+                            Open Full Screenshot in New Tab &rarr;
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -577,6 +667,54 @@ export const AdminApplicationsPage: React.FC = () => {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* High-Resolution In-App Lightbox for Receipt Verification */}
+      {isLightboxOpen && (resolvedProofUrl || selectedApp?.payment_proof_url) && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/95 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[95vh] w-full flex flex-col items-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 text-white">
+              <span className="text-xs font-semibold text-purple-300">
+                Easypaisa Payment Proof — {selectedApp?.full_name} (Rs. 300)
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsLightboxOpen(false)}
+                className="p-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <img
+              src={resolvedProofUrl || selectedApp?.payment_proof_url || undefined}
+              alt="Full Resolution Proof"
+              className="max-h-[80vh] w-auto max-w-full rounded-xl object-contain border border-slate-700 bg-black/50 shadow-2xl"
+            />
+            <div className="mt-3 flex items-center gap-4 text-xs">
+              <a
+                href={resolvedProofUrl || selectedApp?.payment_proof_url || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-purple-400 hover:text-purple-300 underline font-medium"
+              >
+                Open Original in New Tab &rarr;
+              </a>
+              <button
+                type="button"
+                onClick={() => setIsLightboxOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                Close (Esc)
+              </button>
             </div>
           </div>
         </div>

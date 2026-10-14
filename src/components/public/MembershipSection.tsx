@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { resolveStorageViewUrl } from '../../lib/storage-helpers';
 import type { MembershipApplication } from '../../types/database.types';
 import { MembershipApplicationModal } from './MembershipApplicationModal';
 import { LoginRequiredModal } from './LoginRequiredModal';
@@ -23,6 +24,8 @@ export const MembershipSection: React.FC = () => {
 
   const [existingApp, setExistingApp] = useState<MembershipApplication | null>(null);
   const [isLoadingApp, setIsLoadingApp] = useState<boolean>(true);
+  const [resolvedProofUrl, setResolvedProofUrl] = useState<string>('');
+  const [proofLoadError, setProofLoadError] = useState<boolean>(false);
 
   // Modals state
   const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
@@ -92,6 +95,22 @@ export const MembershipSection: React.FC = () => {
       isMounted = false;
     };
   }, [user]);
+
+  // Resolve accessible proof URL when application or details modal is loaded
+  useEffect(() => {
+    let isMounted = true;
+    if (existingApp?.payment_proof_url) {
+      setProofLoadError(false);
+      resolveStorageViewUrl(existingApp.payment_proof_url).then((url) => {
+        if (isMounted) setResolvedProofUrl(url);
+      });
+    } else {
+      setResolvedProofUrl('');
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [existingApp?.payment_proof_url, isDetailsModalOpen]);
 
   const handleWithdraw = async () => {
     if (!existingApp || !user) return;
@@ -414,21 +433,38 @@ export const MembershipSection: React.FC = () => {
                   <span className="text-slate-400 block font-semibold mb-2">
                     Easypaisa Payment Proof Receipt
                   </span>
-                  <a
-                    href={existingApp.payment_proof_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block group"
-                  >
-                    <img
-                      src={existingApp.payment_proof_url}
-                      alt="Payment Proof"
-                      className="max-h-48 rounded-lg object-contain border border-slate-200 bg-white mx-auto shadow-sm group-hover:opacity-90 transition-opacity"
-                    />
-                    <span className="text-[11px] text-[#016533] font-semibold text-center block mt-1.5 group-hover:underline">
-                      Click to view full image &rarr;
-                    </span>
-                  </a>
+                  {proofLoadError ? (
+                    <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-center space-y-1.5">
+                      <p className="text-xs text-amber-800 font-medium">
+                        Payment proof receipt image could not be loaded directly.
+                      </p>
+                      <a
+                        href={resolvedProofUrl || existingApp.payment_proof_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-xs font-semibold text-[#016533] underline"
+                      >
+                        Open Proof in New Tab &rarr;
+                      </a>
+                    </div>
+                  ) : (
+                    <a
+                      href={resolvedProofUrl || existingApp.payment_proof_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group"
+                    >
+                      <img
+                        src={resolvedProofUrl || existingApp.payment_proof_url}
+                        alt="Payment Proof"
+                        onError={() => setProofLoadError(true)}
+                        className="max-h-48 rounded-lg object-contain border border-slate-200 bg-white mx-auto shadow-sm group-hover:opacity-90 transition-opacity"
+                      />
+                      <span className="text-[11px] text-[#016533] font-semibold text-center block mt-1.5 group-hover:underline">
+                        Click to view full image &rarr;
+                      </span>
+                    </a>
+                  )}
                 </div>
               )}
             </div>
