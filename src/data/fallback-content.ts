@@ -236,4 +236,18 @@ export const INITIAL_LEADERSHIP_PLACEHOLDERS: LeadershipProfile[] = [
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   },
+  {
+    id: 'leader-10',
+    full_name: 'Eshaal Khan',
+    role_title: 'Executive Committee Member',
+    bio: 'Executive Committee Member of SIGN SMC. Dedicated to advancing student engagement in neurological sciences, coordinating academic seminars, clinical workshops, and peer mentorship across Saidu Medical College.',
+    academic_year: 'Executive Committee Member SIGN SMC',
+    photo_url: 'https://images.unsplash.com/photo-1594824813501-483701476327?auto=format&fit=crop&q=80&w=600',
+    contact_email: 'eshaal.smc@student.edu.pk',
+    social_links: {},
+    display_order: 10,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
 ];

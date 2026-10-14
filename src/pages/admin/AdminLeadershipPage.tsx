@@ -121,7 +121,28 @@ export const AdminLeadershipPage: React.FC = () => {
       try {
         const stored = sessionStorage.getItem('sign_dev_leadership_profiles');
         if (stored) {
-          setProfiles(JSON.parse(stored));
+          const parsed = JSON.parse(stored) as LeadershipProfile[];
+          const existingNames = new Set(parsed.map((p) => p.full_name.toLowerCase()));
+          const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
+            (init) => !existingNames.has(init.full_name.toLowerCase())
+          );
+          const combined = [...parsed, ...missingDefaults].map((p) => {
+            const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
+              (f) =>
+                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
+                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+            );
+            if (match) {
+              return {
+                ...p,
+                bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
+                academic_year: p.academic_year || match.academic_year,
+                photo_url: p.photo_url || match.photo_url,
+              };
+            }
+            return p;
+          });
+          setProfiles(combined.sort((a, b) => a.display_order - b.display_order));
           setIsLoading(false);
           return;
         }
@@ -155,16 +176,26 @@ export const AdminLeadershipPage: React.FC = () => {
 
         const merged = combined.map((p) => {
           const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
-            (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
+            (f) =>
+              f.display_order === p.display_order ||
+              f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
+              (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
           );
-          if (
-            fallbackMatch &&
-            (!p.bio ||
-              p.bio.startsWith('Patron-in-Chief of the Student') ||
-              p.bio.startsWith('Consultant Neurologist at Saidu') ||
-              p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
-          ) {
-            return { ...p, bio: fallbackMatch.bio, photo_url: p.photo_url || fallbackMatch.photo_url };
+          if (fallbackMatch) {
+            return {
+              ...p,
+              bio:
+                p.bio &&
+                p.bio.trim().length > 15 &&
+                !p.bio.startsWith('Patron-in-Chief of the Student') &&
+                !p.bio.startsWith('Consultant Neurologist at Saidu') &&
+                !p.bio.startsWith('Scientific & Academic Advisor for SIGN')
+                  ? p.bio
+                  : fallbackMatch.bio,
+              photo_url: p.photo_url || fallbackMatch.photo_url,
+              academic_year: p.academic_year || fallbackMatch.academic_year,
+              role_title: p.role_title || fallbackMatch.role_title,
+            };
           }
           return p;
         });

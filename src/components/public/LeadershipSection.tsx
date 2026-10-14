@@ -17,8 +17,28 @@ export const LeadershipSection: React.FC = () => {
         if (devCached) {
           const parsed = JSON.parse(devCached) as LeadershipProfile[];
           const published = parsed.filter((p) => p.is_published);
-          if (published.length > 0 && isMounted) {
-            setProfiles(published);
+          const existingNames = new Set(published.map((p) => p.full_name.toLowerCase()));
+          const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
+            (init) => !existingNames.has(init.full_name.toLowerCase())
+          );
+          const combined = [...published, ...missingDefaults].map((p) => {
+            const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
+              (f) =>
+                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
+                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+            );
+            if (match) {
+              return {
+                ...p,
+                bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
+                academic_year: p.academic_year || match.academic_year,
+                photo_url: p.photo_url || match.photo_url,
+              };
+            }
+            return p;
+          });
+          if (combined.length > 0 && isMounted) {
+            setProfiles(combined.sort((a, b) => a.display_order - b.display_order));
             setIsLoading(false);
             return;
           }
@@ -52,16 +72,25 @@ export const LeadershipSection: React.FC = () => {
 
           const merged = combined.map((p) => {
             const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
-              (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
+              (f) =>
+                f.display_order === p.display_order ||
+                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
+                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
-            if (
-              fallbackMatch &&
-              (!p.bio ||
-                p.bio.startsWith('Patron-in-Chief of the Student') ||
-                p.bio.startsWith('Consultant Neurologist at Saidu') ||
-                p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
-            ) {
-              return { ...p, bio: fallbackMatch.bio, photo_url: p.photo_url || fallbackMatch.photo_url };
+            if (fallbackMatch) {
+              return {
+                ...p,
+                bio:
+                  p.bio &&
+                  p.bio.trim().length > 15 &&
+                  !p.bio.startsWith('Patron-in-Chief of the Student') &&
+                  !p.bio.startsWith('Consultant Neurologist at Saidu') &&
+                  !p.bio.startsWith('Scientific & Academic Advisor for SIGN')
+                    ? p.bio
+                    : fallbackMatch.bio,
+                photo_url: p.photo_url || fallbackMatch.photo_url,
+                academic_year: p.academic_year || fallbackMatch.academic_year,
+              };
             }
             return p;
           });
@@ -80,34 +109,18 @@ export const LeadershipSection: React.FC = () => {
     };
   }, []);
 
-  // 1. The Main Characters (Faculty & Patron Mentors in strict order)
+  // 1. Patron & Faculty Mentors (Prof. Dr. Muhammad Ayub Khan, Dr. Fawad Ali, Dr. Amjad Iqbal)
   const mainLeaders = [
     profiles.find((p) => p.full_name.toLowerCase().includes('ayub')),
     profiles.find((p) => p.full_name.toLowerCase().includes('fawad')),
     profiles.find((p) => p.full_name.toLowerCase().includes('amjad')),
   ].filter(Boolean) as LeadershipProfile[];
 
-  // 2. Executive Row 1: Founding President (Adil), Saleem Jan, Hadia Zahoor, Irshad Ahmad
-  const executiveRow1 = [
-    profiles.find((p) => p.full_name.toLowerCase().includes('adil')),
-    profiles.find((p) => p.full_name.toLowerCase().includes('saleem')),
-    profiles.find((p) => p.full_name.toLowerCase().includes('hadia')),
-    profiles.find((p) => p.full_name.toLowerCase().includes('irshad')),
-  ].filter(Boolean) as LeadershipProfile[];
-
-  // 3. Executive Row 2: Yusra Panezai, Waqar Younas
-  const executiveRow2 = [
-    profiles.find((p) => p.full_name.toLowerCase().includes('yusra')),
-    profiles.find((p) => p.full_name.toLowerCase().includes('waqar')),
-  ].filter(Boolean) as LeadershipProfile[];
-
-  // Fallback for any other custom profiles
-  const placedIds = new Set([
-    ...mainLeaders.map((p) => p.id),
-    ...executiveRow1.map((p) => p.id),
-    ...executiveRow2.map((p) => p.id),
-  ]);
-  const otherProfiles = profiles.filter((p) => !placedIds.has(p.id));
+  // 2. Executive Committee & Student Stewards (All executive members in order)
+  const mainLeaderIds = new Set(mainLeaders.map((p) => p.id));
+  const executiveProfiles = profiles
+    .filter((p) => !mainLeaderIds.has(p.id))
+    .sort((a, b) => a.display_order - b.display_order);
 
   const renderStudentCard = (person: LeadershipProfile) => (
     <div
@@ -342,22 +355,10 @@ export const LeadershipSection: React.FC = () => {
               </p>
             </div>
 
-            {/* Row 1: Founding President, Saleem Jan, Hadia Zahoor, Irshad Ahmad */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {executiveRow1.map(renderStudentCard)}
+            {/* Unified Responsive Executive Committee Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {executiveProfiles.map(renderStudentCard)}
             </div>
-
-            {/* Row 2: Yusra Panezai, Waqar Younas */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto mt-6">
-              {executiveRow2.map(renderStudentCard)}
-            </div>
-
-            {/* Extra profiles if any */}
-            {otherProfiles.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-                {otherProfiles.map(renderStudentCard)}
-              </div>
-            )}
           </div>
         )}
       </div>
