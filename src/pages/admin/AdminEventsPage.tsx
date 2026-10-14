@@ -589,10 +589,10 @@ export const AdminEventsPage: React.FC = () => {
                     Cover Image URL (Optional)
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={coverImageUrl}
                     onChange={(e) => setCoverImageUrl(e.target.value)}
-                    placeholder="https://... image link"
+                    placeholder="https://... or /banners/... image link"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
                   />
                 </div>

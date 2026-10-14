@@ -480,10 +480,10 @@ export const AdminLeadershipPage: React.FC = () => {
                     Portrait Photograph URL
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={photoUrl}
                     onChange={(e) => setPhotoUrl(e.target.value)}
-                    placeholder="https://... secure photo link"
+                    placeholder="/leadership/... or https://... image URL"
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
                   />
                 </div>
