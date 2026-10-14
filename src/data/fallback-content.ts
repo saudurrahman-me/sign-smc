@@ -11,6 +11,8 @@ import profAyubKhanImg from '../assets/leadership/prof-dr-muhammad-ayub-khan.jpg
 import drAmjadIqbalImg from '../assets/leadership/dr-amjad-iqbal.jpg';
 import adilKhanImg from '../assets/leadership/adil-khan.jpg';
 import saleemJanImg from '../assets/leadership/saleem-jan.jpg';
+import hadiaZahoorImg from '../assets/leadership/hadia-zahoor.jpg';
+import yusraPanezaiImg from '../assets/leadership/yusra-panezai.jpg';
 import financeSecretaryImg from '../assets/leadership/finance-secretary.png';
 import mediaHeadImg from '../assets/leadership/media-head.jpg';
 
@@ -175,11 +177,11 @@ export const INITIAL_LEADERSHIP_PLACEHOLDERS: LeadershipProfile[] = [
   },
   {
     id: 'leader-6',
-    full_name: 'Waqar Younas',
-    role_title: 'Finance Secretary',
-    bio: 'Managing financial stewardship, budget planning, event resources, and fiscal transparency for SIGN Chapter programs and academic conferences.',
-    academic_year: 'Finance Secretary SIGN SMC',
-    photo_url: financeSecretaryImg,
+    full_name: 'Hadia Zahoor',
+    role_title: 'Co-Head, Event Organizing Committee',
+    bio: 'Co-Head of the Event Organizing Committee at SIGN SMC. Facilitating neurology workshops, guest speaker coordination, academic symposia, and clinical seminar logistics.',
+    academic_year: 'Co-Head Event Organizing Committee',
+    photo_url: hadiaZahoorImg,
     contact_email: null,
     social_links: {},
     display_order: 6,
@@ -197,6 +199,34 @@ export const INITIAL_LEADERSHIP_PLACEHOLDERS: LeadershipProfile[] = [
     contact_email: 'irshadahmad.access@gmail.com',
     social_links: {},
     display_order: 7,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-8',
+    full_name: 'Yusra Panezai',
+    role_title: 'Head, Event Organizing Committee',
+    bio: 'Head of the Event Organizing Committee at SIGN SMC. Leading chapter event planning, academic scheduling, venue management, and volunteer coordination for neuroscience programs.',
+    academic_year: 'Head Event Organizing Committee',
+    photo_url: yusraPanezaiImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 8,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-9',
+    full_name: 'Waqar Younas',
+    role_title: 'Finance Secretary',
+    bio: 'Managing financial stewardship, budget planning, event resources, and fiscal transparency for SIGN Chapter programs and academic conferences.',
+    academic_year: 'Finance Secretary SIGN SMC',
+    photo_url: financeSecretaryImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 9,
     is_published: true,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

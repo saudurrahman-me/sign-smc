@@ -74,7 +74,16 @@ export const AdminLeadershipPage: React.FC = () => {
       if (error) {
         console.error('[SIGN Admin Leadership] Error:', error.message);
       } else if (data) {
-        const merged = (data as LeadershipProfile[]).map((p) => {
+        const fetched = data as LeadershipProfile[];
+        const existingNames = new Set(fetched.map((p) => p.full_name.toLowerCase()));
+        const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
+          (init) => !existingNames.has(init.full_name.toLowerCase())
+        );
+        const combined = [...fetched, ...missingDefaults].sort(
+          (a, b) => a.display_order - b.display_order
+        );
+
+        const merged = combined.map((p) => {
           const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
             (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
           );
@@ -85,7 +94,7 @@ export const AdminLeadershipPage: React.FC = () => {
               p.bio.startsWith('Consultant Neurologist at Saidu') ||
               p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
           ) {
-            return { ...p, bio: fallbackMatch.bio };
+            return { ...p, bio: fallbackMatch.bio, photo_url: p.photo_url || fallbackMatch.photo_url };
           }
           return p;
         });

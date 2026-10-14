@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, Mail, ExternalLink, ShieldCheck, Clock } from 'lucide-react';
+import { User, Mail, ShieldCheck, Clock } from 'lucide-react';
 import { LinkedinIcon, TwitterIcon } from '../brand/SocialIcons';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { LeadershipProfile } from '../../types/database.types';
@@ -41,7 +41,16 @@ export const LeadershipSection: React.FC = () => {
         if (error) {
           console.error('[SIGN Leadership] Error fetching profiles:', error.message);
         } else if (data && data.length > 0 && isMounted) {
-          const merged = (data as LeadershipProfile[]).map((p) => {
+          const fetched = data as LeadershipProfile[];
+          const existingNames = new Set(fetched.map((p) => p.full_name.toLowerCase()));
+          const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
+            (init) => !existingNames.has(init.full_name.toLowerCase())
+          );
+          const combined = [...fetched, ...missingDefaults].sort(
+            (a, b) => a.display_order - b.display_order
+          );
+
+          const merged = combined.map((p) => {
             const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) => f.display_order === p.display_order || f.full_name.toLowerCase() === p.full_name.toLowerCase()
             );
@@ -52,7 +61,7 @@ export const LeadershipSection: React.FC = () => {
                 p.bio.startsWith('Consultant Neurologist at Saidu') ||
                 p.bio.startsWith('Scientific & Academic Advisor for SIGN'))
             ) {
-              return { ...p, bio: fallbackMatch.bio };
+              return { ...p, bio: fallbackMatch.bio, photo_url: p.photo_url || fallbackMatch.photo_url };
             }
             return p;
           });
@@ -71,6 +80,132 @@ export const LeadershipSection: React.FC = () => {
     };
   }, []);
 
+  // 1. The Main Characters (Faculty & Patron Mentors in strict order)
+  const mainLeaders = [
+    profiles.find((p) => p.full_name.toLowerCase().includes('ayub')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('fawad')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('amjad')),
+  ].filter(Boolean) as LeadershipProfile[];
+
+  // 2. Executive Row 1: Founding President (Adil), Saleem Jan, Hadia Zahoor, Irshad Ahmad
+  const executiveRow1 = [
+    profiles.find((p) => p.full_name.toLowerCase().includes('adil')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('saleem')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('hadia')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('irshad')),
+  ].filter(Boolean) as LeadershipProfile[];
+
+  // 3. Executive Row 2: Yusra Panezai, Waqar Younas
+  const executiveRow2 = [
+    profiles.find((p) => p.full_name.toLowerCase().includes('yusra')),
+    profiles.find((p) => p.full_name.toLowerCase().includes('waqar')),
+  ].filter(Boolean) as LeadershipProfile[];
+
+  // Fallback for any other custom profiles
+  const placedIds = new Set([
+    ...mainLeaders.map((p) => p.id),
+    ...executiveRow1.map((p) => p.id),
+    ...executiveRow2.map((p) => p.id),
+  ]);
+  const otherProfiles = profiles.filter((p) => !placedIds.has(p.id));
+
+  const renderStudentCard = (person: LeadershipProfile) => (
+    <div
+      key={person.id}
+      className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:border-[#016533]/50 hover:shadow-lg transition-all duration-300"
+    >
+      {/* Portrait Photo */}
+      <div className="relative aspect-4/5 bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden">
+        {person.photo_url ? (
+          <img
+            src={person.photo_url}
+            alt={`${person.full_name} - ${person.role_title}`}
+            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+            loading="eager"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
+            <div className="w-16 h-16 rounded-full bg-slate-300/60 flex items-center justify-center mb-3 text-slate-500">
+              <User className="w-8 h-8" />
+            </div>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 inline-flex items-center gap-1">
+              <Clock className="w-3 h-3 text-[#016533]" />
+              Profile Pending
+            </span>
+          </div>
+        )}
+
+        {/* Academic Role Badge */}
+        <div className="absolute top-3 left-3">
+          <span className="px-2.5 py-1 rounded-md text-[11px] font-bold bg-[#031D12]/90 backdrop-blur-md text-emerald-300 border border-emerald-500/30 shadow-sm">
+            {person.role_title}
+          </span>
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className="p-5 flex-1 flex flex-col justify-between">
+        <div>
+          <h4 className="font-bold text-base text-slate-900 group-hover:text-[#016533] transition-colors">
+            {person.full_name}
+          </h4>
+          {person.academic_year && (
+            <p className="text-xs font-semibold text-[#016533] mt-0.5">
+              {person.academic_year}
+            </p>
+          )}
+          {person.bio && (
+            <p className="text-xs text-slate-600 mt-2.5 leading-relaxed line-clamp-4">
+              {person.bio}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+          <div className="flex items-center gap-1.5">
+            {person.contact_email && (
+              <a
+                href={`mailto:${person.contact_email}`}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
+                title="Contact Email"
+                aria-label={`Email ${person.full_name}`}
+              >
+                <Mail className="w-4 h-4" />
+              </a>
+            )}
+            {person.social_links?.linkedin && (
+              <a
+                href={person.social_links.linkedin}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
+                title="LinkedIn Profile"
+                aria-label={`LinkedIn for ${person.full_name}`}
+              >
+                <LinkedinIcon className="w-4 h-4" />
+              </a>
+            )}
+            {person.social_links?.twitter && (
+              <a
+                href={person.social_links.twitter}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
+                title="Twitter Profile"
+                aria-label={`Twitter for ${person.full_name}`}
+              >
+                <TwitterIcon className="w-4 h-4" />
+              </a>
+            )}
+          </div>
+          <span className="text-[10px] font-mono text-slate-400">
+            SIGN SMC
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <section id="leadership" className="py-24 bg-white border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -84,7 +219,7 @@ export const LeadershipSection: React.FC = () => {
             Leadership & Executive Committee
           </h2>
           <p className="mt-2 text-sm sm:text-base text-slate-600">
-            Student stewards, candidate nominees, and faculty mentors guiding the SIGN-SMC Chapter at Saidu Medical College.
+            Faculty patrons, consultant neurologist mentors, and student stewards guiding the SIGN Chapter at Saidu Medical College.
           </p>
         </div>
 
@@ -94,136 +229,135 @@ export const LeadershipSection: React.FC = () => {
             <div className="w-8 h-8 border-3 border-[#016533] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <div
-            className={`grid grid-cols-1 sm:grid-cols-2 ${
-              profiles.length <= 3 ? 'lg:grid-cols-3 max-w-5xl mx-auto' : 'lg:grid-cols-4'
-            } gap-8`}
-          >
-            {profiles.map((person) => {
-              const isPlaceholder =
-                person.full_name.includes('Pending') ||
-                person.full_name.includes('Awaiting') ||
-                !person.photo_url;
-
-              return (
+          <div>
+            {/* 1. Main Characters (Faculty & Patron Mentors: Prof. Ayub, Dr. Fawad, Dr. Amjad) */}
+            <div className="space-y-6 max-w-5xl mx-auto mb-16">
+              {mainLeaders.map((person) => (
                 <div
                   key={person.id}
-                  className="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col group hover:border-emerald-500/50 hover:shadow-md transition-all"
+                  className="rounded-3xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col md:flex-row group hover:border-[#016533]/50 hover:shadow-xl transition-all duration-300"
                 >
-                  {/* Portrait Card Image or Distinctive Placeholder */}
-                  <div className="relative aspect-4/5 bg-gradient-to-b from-slate-100 to-slate-200 flex items-center justify-center overflow-hidden">
+                  {/* Left Side: Photo */}
+                  <div className="md:w-72 lg:w-80 flex-shrink-0 relative bg-gradient-to-b from-slate-100 to-slate-200 aspect-4/5 md:aspect-auto md:min-h-[290px] overflow-hidden">
                     {person.photo_url ? (
                       <img
                         src={person.photo_url}
                         alt={`${person.full_name} - ${person.role_title}`}
-                        className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
                         loading="eager"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
-                        <div className="w-16 h-16 rounded-full bg-slate-300/60 flex items-center justify-center mb-3 text-slate-500">
-                          <User className="w-8 h-8" />
-                        </div>
-                        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-[#016533]" />
-                          Profile Pending
-                        </span>
-                        <p className="text-[11px] text-slate-400 mt-1 max-w-[180px]">
-                          Official appointment or biography awaiting publication
-                        </p>
+                      <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400 h-full">
+                        <User className="w-16 h-16 text-slate-400" />
                       </div>
                     )}
-
-                    {/* Academic Position Tag */}
-                    <div className="absolute top-3 left-3">
-                      <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-[#031D12]/90 backdrop-blur-md text-emerald-300 border border-emerald-500/30 shadow-sm">
+                    <div className="absolute top-3 left-3 md:hidden">
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#031D12]/90 backdrop-blur-md text-emerald-300 border border-emerald-500/30">
                         {person.role_title}
                       </span>
                     </div>
                   </div>
 
-                  {/* Card Content */}
-                  <div className="p-5 flex-1 flex flex-col justify-between">
+                  {/* Right Side: Details & Biography */}
+                  <div className="p-6 sm:p-8 flex-1 flex flex-col justify-between">
                     <div>
-                      <h3
-                        className={`font-bold text-base ${
-                          isPlaceholder ? 'text-slate-600 italic' : 'text-slate-900'
-                        }`}
-                      >
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-2">
+                        <span className="hidden md:inline-flex px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-[#016533] border border-emerald-200">
+                          {person.role_title}
+                        </span>
+                        {person.contact_email && (
+                          <a
+                            href={`mailto:${person.contact_email}`}
+                            className="text-xs font-mono text-slate-500 hover:text-[#016533] flex items-center gap-1.5 transition-colors"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-[#016533]" />
+                            {person.contact_email}
+                          </a>
+                        )}
+                      </div>
+
+                      <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
                         {person.full_name}
                       </h3>
+
                       {person.academic_year && (
-                        <p className="text-xs font-semibold text-[#016533] mt-0.5">
+                        <p className="text-sm font-semibold text-[#016533] mt-1">
                           {person.academic_year}
                         </p>
                       )}
+
                       {person.bio && (
-                        <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
-                          {person.bio}
-                        </p>
+                        <div className="mt-4 pt-4 border-t border-slate-100">
+                          <p className="text-sm sm:text-base text-slate-700 leading-relaxed italic border-l-2 border-[#016533] pl-4">
+                            "{person.bio}"
+                          </p>
+                        </div>
                       )}
                     </div>
 
-                    {/* Verified Contact or Social links (hidden if unconfigured) */}
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center gap-2">
-                      {person.contact_email && (
-                        <a
-                          href={`mailto:${person.contact_email}`}
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
-                          title="Contact Email"
-                          aria-label={`Email ${person.full_name}`}
-                        >
-                          <Mail className="w-4 h-4" />
-                        </a>
-                      )}
-                      {person.social_links?.linkedin && (
-                        <a
-                          href={person.social_links.linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
-                          title="LinkedIn Profile"
-                          aria-label={`LinkedIn for ${person.full_name}`}
-                        >
-                          <LinkedinIcon className="w-4 h-4" />
-                        </a>
-                      )}
-                      {person.social_links?.twitter && (
-                        <a
-                          href={person.social_links.twitter}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
-                          title="Twitter Profile"
-                          aria-label={`Twitter for ${person.full_name}`}
-                        >
-                          <TwitterIcon className="w-4 h-4" />
-                        </a>
-                      )}
-                      {person.social_links?.researchgate && (
-                        <a
-                          href={person.social_links.researchgate}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
-                          title="ResearchGate"
-                          aria-label={`ResearchGate for ${person.full_name}`}
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      {!person.contact_email &&
-                        !person.social_links?.linkedin &&
-                        !person.social_links?.twitter && (
-                          <span className="text-[11px] text-slate-400 italic">
-                            Saidu Medical College Chapter
-                          </span>
+                    <div className="mt-6 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                      <span className="font-medium text-slate-500">
+                        Saidu Medical College (SMC) & Saidu Group of Teaching Hospitals (SGTH)
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {person.social_links?.linkedin && (
+                          <a
+                            href={person.social_links.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
+                            title="LinkedIn Profile"
+                          >
+                            <LinkedinIcon className="w-4 h-4" />
+                          </a>
                         )}
+                        {person.social_links?.twitter && (
+                          <a
+                            href={person.social_links.twitter}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-[#016533] hover:bg-emerald-50 transition-colors"
+                            title="Twitter Profile"
+                          >
+                            <TwitterIcon className="w-4 h-4" />
+                          </a>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {/* 2. Executive Committee & Student Stewards Section */}
+            <div className="text-center max-w-2xl mx-auto mb-10 pt-10 border-t border-slate-200">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-[#016533] border border-emerald-200 mb-2">
+                Executive Committee & Student Stewards
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                Chapter Operations & Committee Leadership
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
+                Student stewards leading chapter organization, neuroscience workshops, event management, and communications.
+              </p>
+            </div>
+
+            {/* Row 1: Founding President, Saleem Jan, Hadia Zahoor, Irshad Ahmad */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {executiveRow1.map(renderStudentCard)}
+            </div>
+
+            {/* Row 2: Yusra Panezai, Waqar Younas */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto mt-6">
+              {executiveRow2.map(renderStudentCard)}
+            </div>
+
+            {/* Extra profiles if any */}
+            {otherProfiles.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+                {otherProfiles.map(renderStudentCard)}
+              </div>
+            )}
           </div>
         )}
       </div>
