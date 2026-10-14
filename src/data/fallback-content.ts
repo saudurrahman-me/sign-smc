@@ -1,0 +1,204 @@
+// ==============================================================================
+// Authentic Default / Initial Organization Data
+// Student Interest Group in Neurology (SIGN), Saidu Medical College (SMC), Swat
+// Source of truth: Official Organizational Charter
+// Note: No claims, achievements, or real personal details fabricated.
+// ==============================================================================
+
+import type { LeadershipProfile, SiteSettings } from '../types/database.types';
+import drFawadAliImg from '../assets/leadership/dr-fawad-ali.jpg';
+import profAyubKhanImg from '../assets/leadership/prof-dr-muhammad-ayub-khan.jpg';
+import drAmjadIqbalImg from '../assets/leadership/dr-amjad-iqbal.jpg';
+import adilKhanImg from '../assets/leadership/adil-khan.jpg';
+import saleemJanImg from '../assets/leadership/saleem-jan.jpg';
+import financeSecretaryImg from '../assets/leadership/finance-secretary.png';
+import mediaHeadImg from '../assets/leadership/media-head.jpg';
+
+export const OFFICIAL_MEMBERSHIP_FORM_URL = 'https://forms.gle/jzUr115noQ1fDNdS8';
+
+export const OFFICIAL_SETTINGS: SiteSettings = {
+  id: 1,
+  organization_name: 'Student Interest Group in Neurology (SIGN)',
+  institution: 'Saidu Medical College (SMC), Swat',
+  affiliation: 'Saidu Medical College (SMC), Swat',
+  contact_email: 'signsmc.official@gmail.com',
+  contact_phone: null,
+  address: 'Saidu Medical College, Saidu Sharif, Swat, Khyber Pakhtunkhwa, Pakistan',
+  social_links: {
+    instagram: 'https://www.instagram.com/sign.smc',
+    facebook: 'https://www.facebook.com/signsmc',
+    linkedin: '',
+    youtube: '',
+  },
+  membership_open: true,
+  membership_form_url: OFFICIAL_MEMBERSHIP_FORM_URL,
+  membership_guidelines:
+    'Membership is open to MBBS students at Saidu Medical College interested in neurology, clinical neuroscience, and student-led academic research.',
+  updated_at: new Date().toISOString(),
+  updated_by: null,
+};
+
+export const OFFICIAL_CONTENT = {
+  preamble: {
+    title: 'About SIGN',
+    subtitle: 'Academic Society Preamble',
+    content:
+      'The Student Interest Group in Neurology (SIGN) Chapter at Saidu Medical College (SMC), Swat, is a student-led academic society established under the auspices of the institution. SIGN exists to nurture a generation of clinically grounded, research-oriented, and socially aware physicians who champion neurological health — at the bedside, in the community, and in the scientific literature.',
+  },
+  mission: {
+    title: 'Mission Statement',
+    subtitle: 'Our Purpose & Academic Mandate',
+    content:
+      'To empower MBBS students at Saidu Medical College to explore neuroscience through academic excellence, community engagement, and student-led research — building the next generation of neurologically literate physicians in Khyber Pakhtunkhwa.',
+  },
+  vision: {
+    title: 'Vision Statement',
+    subtitle: 'Our Long-Term Horizon for KPK',
+    content:
+      'To be the leading student neuroscience society in KPK — producing graduates who are clinically competent, research-active, and deeply committed to improving neurological health outcomes in underserved communities.',
+  },
+  objectives: {
+    title: 'Core Objectives',
+    subtitle: 'Six Action Pillars',
+    items: [
+      {
+        number: 1,
+        title: 'Cultivate Student Interest',
+        description:
+          'Cultivate student interest in clinical neurology, neuroscience research, and neurological public health.',
+      },
+      {
+        number: 2,
+        title: 'Organize Evidence-Based Events',
+        description:
+          'Organize evidence-based academic events: seminars, case discussions, journal clubs, and LTE writing workshops.',
+      },
+      {
+        number: 3,
+        title: 'Community Health Awareness',
+        description:
+          'Conduct community awareness campaigns on epilepsy, stroke, dementia, and mental health.',
+      },
+      {
+        number: 4,
+        title: 'Facilitate Scholarly Research',
+        description:
+          'Facilitate student-led research and structured pathways toward scholarly publication.',
+      },
+      {
+        number: 5,
+        title: 'Leadership & Teamwork Skills',
+        description:
+          'Foster leadership, communication, and teamwork skills within the SMC student body.',
+      },
+      {
+        number: 6,
+        title: 'Academic Networks & Mentorship',
+        description:
+          'Collaborate with national and international neuroscience networks, student organizations, and faculty mentors.',
+      },
+    ],
+  },
+};
+
+// Official Leadership and Executive Board Profiles
+export const INITIAL_LEADERSHIP_PLACEHOLDERS: LeadershipProfile[] = [
+  {
+    id: 'leader-1',
+    full_name: 'Prof. Dr. Muhammad Ayub Khan',
+    role_title: 'Patron-in-Chief',
+    bio: 'Patron-in-Chief of the Student Interest Group in Neurology (SIGN), Saidu Medical College (SMC), Swat. Providing institutional patronage, executive mentorship, and academic vision.',
+    academic_year: 'Patron-in-Chief SIGN SMC',
+    photo_url: profAyubKhanImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 1,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-2',
+    full_name: 'Dr. Fawad Ali',
+    role_title: 'Chairman',
+    bio: 'Consultant Neurologist at Saidu Group of Teaching Hospitals (SGTH), Swat. Leading clinical neurology initiatives, student mentoring, and neurological education at the SIGN SMC Chapter.',
+    academic_year: 'Consultant Neurologist SGTH',
+    photo_url: drFawadAliImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 2,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-3',
+    full_name: 'Dr. Amjad Iqbal',
+    role_title: 'Scientific & Academic Advisor',
+    bio: 'Scientific & Academic Advisor for SIGN SMC. Consultant Neurologist & Stroke Specialist, directing scholarly research initiatives, journal clubs, and clinical neuroscience workshops.',
+    academic_year: 'Consultant Neurologist & Stroke Specialist',
+    photo_url: drAmjadIqbalImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 3,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-4',
+    full_name: 'Adil Khan',
+    role_title: 'Founding President',
+    bio: 'Founding President of the Student Interest Group in Neurology (SIGN) Chapter at Saidu Medical College. Spearheading student leadership, chapter organization, neuroscience workshops, and research collaborations.',
+    academic_year: 'Founding President SIGN SMC',
+    photo_url: adilKhanImg,
+    contact_email: 'adilmusawir@gmail.com',
+    social_links: {},
+    display_order: 4,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-5',
+    full_name: 'Saleem Jan',
+    role_title: 'General Secretary',
+    bio: 'General Secretary of SIGN SMC. Overseeing executive administration, member coordination, chapter operations, and academic seminar scheduling.',
+    academic_year: 'General Secretary SIGN SMC',
+    photo_url: saleemJanImg,
+    contact_email: 'sj3463586@gmail.com',
+    social_links: {},
+    display_order: 5,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-6',
+    full_name: 'Waqar Younas',
+    role_title: 'Finance Secretary',
+    bio: 'Managing financial stewardship, budget planning, event resources, and fiscal transparency for SIGN Chapter programs and academic conferences.',
+    academic_year: 'Finance Secretary SIGN SMC',
+    photo_url: financeSecretaryImg,
+    contact_email: null,
+    social_links: {},
+    display_order: 6,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    id: 'leader-7',
+    full_name: 'Irshad Ahmad',
+    role_title: 'Media & Communication Head',
+    bio: 'Media & Communication Head of SIGN SMC. Directing public relations, academic communications, digital outreach, event media coverage, and neurological awareness campaigns.',
+    academic_year: 'Media & Communication Head SIGN SMC',
+    photo_url: mediaHeadImg,
+    contact_email: 'irshadahmad.access@gmail.com',
+    social_links: {},
+    display_order: 7,
+    is_published: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];

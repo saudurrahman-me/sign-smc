@@ -1,0 +1,63 @@
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { AboutSection } from '../components/public/AboutSection';
+import { MissionVisionSection } from '../components/public/MissionVisionSection';
+import { LeadershipSection } from '../components/public/LeadershipSection';
+import { EventsSection } from '../components/public/EventsSection';
+import { ContactSection } from '../components/public/ContactSection';
+import { OFFICIAL_CONTENT } from '../data/fallback-content';
+
+describe('Public Website Academic Sections', () => {
+  it('renders official Preamble verbatim without modification', () => {
+    render(<AboutSection />);
+    expect(screen.getByText(/About SIGN Chapter/i)).toBeInTheDocument();
+    expect(screen.getByText(`"${OFFICIAL_CONTENT.preamble.content}"`)).toBeInTheDocument();
+    expect(screen.getAllByText(/At the Bedside/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/In the Community/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/In Scientific Literature/i).length).toBeGreaterThan(0);
+  });
+
+  it('renders official Mission, Vision, and all 6 Core Objectives', () => {
+    render(<MissionVisionSection />);
+    expect(screen.getByText(OFFICIAL_CONTENT.mission.content)).toBeInTheDocument();
+    expect(screen.getByText(OFFICIAL_CONTENT.vision.content)).toBeInTheDocument();
+
+    // Verify all 6 objectives
+    OFFICIAL_CONTENT.objectives.items.forEach((obj) => {
+      expect(screen.getByText(obj.title)).toBeInTheDocument();
+      expect(screen.getByText(obj.description)).toBeInTheDocument();
+    });
+  });
+
+  it('renders leadership section with official leadership members', () => {
+    render(<LeadershipSection />);
+    expect(screen.getByText(/Leadership & Executive Committee/i)).toBeInTheDocument();
+    expect(screen.getByText(/Prof. Dr. Muhammad Ayub Khan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dr. Fawad Ali/i)).toBeInTheDocument();
+    expect(screen.getByText(/Dr. Amjad Iqbal/i)).toBeInTheDocument();
+    expect(screen.getByText(/Adil Khan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Saleem Jan/i)).toBeInTheDocument();
+    expect(screen.getByText(/Waqar Younas/i)).toBeInTheDocument();
+    expect(screen.getByText(/Irshad Ahmad/i)).toBeInTheDocument();
+
+    // Verify verified email contact links
+    expect(screen.getByLabelText(/Email Adil Khan/i)).toHaveAttribute('href', 'mailto:adilmusawir@gmail.com');
+    expect(screen.getByLabelText(/Email Saleem Jan/i)).toHaveAttribute('href', 'mailto:sj3463586@gmail.com');
+    expect(screen.getByLabelText(/Email Irshad Ahmad/i)).toHaveAttribute('href', 'mailto:irshadahmad.access@gmail.com');
+  });
+
+  it('renders events section with clean empty state when no upcoming events exist', () => {
+    render(<EventsSection />);
+    expect(screen.getByText(/Events & Academic Activities/i)).toBeInTheDocument();
+    expect(screen.getByText(/No Upcoming Events Currently Scheduled/i)).toBeInTheDocument();
+  });
+
+  it('renders contact section with institutional coordinates, email, and verified channels', () => {
+    render(<ContactSection />);
+    expect(screen.getByText(/Saidu Medical College, Saidu Sharif, Swat/i)).toBeInTheDocument();
+    expect(screen.getByText(/Official Inquiries/i)).toBeInTheDocument();
+    expect(screen.getByText(/signsmc.official@gmail.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/Instagram Channel/i)).toBeInTheDocument();
+    expect(screen.getByText(/Facebook Community/i)).toBeInTheDocument();
+  });
+});

@@ -1,0 +1,196 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { Menu, X, Shield, User as UserIcon, LogOut } from 'lucide-react';
+import { SignLogo } from '../brand/SignLogo';
+import { useAuth } from '../../context/AuthContext';
+
+export const Navbar: React.FC = () => {
+  const { user, profile, isWebsiteAdmin, isEventManager, isSuperAdmin, signOut } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const navLinks = [
+    { name: 'Home', href: '#home' },
+    { name: 'About', href: '#about' },
+    { name: 'Mission & Vision', href: '#mission' },
+    { name: 'Leadership', href: '#leadership' },
+    { name: 'Events', href: '#events' },
+    { name: 'Membership', href: '#membership' },
+    { name: 'Contact', href: '#contact' },
+  ];
+
+  const hasAdminAccess = isSuperAdmin || isWebsiteAdmin || isEventManager;
+
+  return (
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? 'glass-nav py-3 shadow-lg shadow-black/30'
+          : 'bg-[#031D12]/94 backdrop-blur-md py-4 border-b border-emerald-900/40'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between">
+          {/* Logo Branding */}
+          <a href="#home" className="focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg">
+            <SignLogo variant="full" size="sm" inverted={true} />
+          </a>
+
+          {/* Desktop Navigation Links */}
+          <nav className="hidden lg:flex items-center gap-6" aria-label="Main Navigation">
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors focus:outline-none focus:text-emerald-400"
+              >
+                {link.name}
+              </a>
+            ))}
+          </nav>
+
+          {/* Right Action Buttons */}
+          <div className="hidden lg:flex items-center gap-3">
+            {user ? (
+              <div className="flex items-center gap-2">
+                {hasAdminAccess && (
+                  <Link
+                    to="/admin"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#016533]/30 text-emerald-300 border border-emerald-500/40 hover:bg-[#016533]/50 transition-all"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    Admin Panel
+                  </Link>
+                )}
+                <Link
+                  to="/membership-status"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700 transition-all"
+                  title={user.email}
+                >
+                  <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="max-w-[120px] truncate">{profile?.full_name || 'My Application'}</span>
+                </Link>
+                <button
+                  onClick={() => signOut()}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all"
+                  title="Sign Out"
+                  aria-label="Sign Out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/login"
+                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                >
+                  Sign In
+                </Link>
+                <a
+                  href="#membership"
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/40 transition-all transform hover:-translate-y-0.5"
+                >
+                  Apply for Membership
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Mobile Menu Hamburger Button */}
+          <div className="flex lg:hidden items-center gap-2">
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              aria-label="Toggle navigation menu"
+              aria-expanded={isOpen}
+            >
+              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Drawer */}
+      {isOpen && (
+        <div className="lg:hidden border-t border-emerald-900/50 bg-[#031D12]/98 px-4 pt-3 pb-6 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+          <div className="flex flex-col space-y-2">
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                onClick={() => setIsOpen(false)}
+                className="px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:text-emerald-400 hover:bg-emerald-950/40 transition-colors"
+              >
+                {link.name}
+              </a>
+            ))}
+
+            <div className="pt-4 mt-2 border-t border-slate-800 flex flex-col gap-2">
+              {user ? (
+                <>
+                  <div className="px-3 py-2 text-xs text-slate-400 bg-slate-800/40 rounded-lg">
+                    Signed in as <span className="font-semibold text-slate-200">{profile?.full_name || user.email}</span>
+                  </div>
+                  {hasAdminAccess && (
+                    <Link
+                      to="/admin"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold bg-[#016533]/20 text-emerald-300 border border-emerald-500/30"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Admin Dashboard
+                    </Link>
+                  )}
+                  <Link
+                    to="/membership-status"
+                    onClick={() => setIsOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-200 bg-slate-800"
+                  >
+                    <UserIcon className="w-4 h-4 text-emerald-400" />
+                    My Application Status
+                  </Link>
+                  <button
+                    onClick={() => {
+                      signOut();
+                      setIsOpen(false);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 text-left"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/login"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full text-center px-4 py-2.5 rounded-lg text-sm font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 transition-all"
+                  >
+                    Sign In
+                  </Link>
+                  <a
+                    href="#membership"
+                    onClick={() => setIsOpen(false)}
+                    className="w-full text-center px-4 py-2.5 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] shadow-md transition-all"
+                  >
+                    Apply for Membership
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </header>
+  );
+};

@@ -1,0 +1,660 @@
+import React, { useState, useEffect } from 'react';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import type { EventItem, EventCategory } from '../../types/database.types';
+import { useAuth } from '../../context/AuthContext';
+import {
+  Calendar,
+  Plus,
+  Edit2,
+  Trash2,
+  Eye,
+  EyeOff,
+  Video,
+  MapPin,
+  Search,
+  Filter,
+  AlertCircle,
+  X,
+} from 'lucide-react';
+
+export const AdminEventsPage: React.FC = () => {
+  const { user } = useAuth();
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventItem | null>(null);
+
+  // Form Fields
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [category, setCategory] = useState<EventCategory>('Seminars & Guest Lectures');
+  const [eventDate, setEventDate] = useState('');
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [venue, setVenue] = useState('Saidu Medical College Auditorium');
+  const [isVirtual, setIsVirtual] = useState(false);
+  const [organizer, setOrganizer] = useState('SIGN SMC Chapter');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [registrationUrl, setRegistrationUrl] = useState('');
+  const [isPublished, setIsPublished] = useState(false);
+
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const categories: EventCategory[] = [
+    'Seminars & Guest Lectures',
+    'Case Discussions',
+    'Journal Clubs',
+    'Research Workshops',
+    'Neurological Awareness Campaigns',
+    'Academic Activities',
+  ];
+
+  const DEMO_EVENTS: EventItem[] = [
+    {
+      id: 'demo-evt-1',
+      title: 'Clinical Neuroscience Symposium 2026',
+      description: 'An academic conference focused on modern stroke management, neuroimaging breakthroughs, and clinical neuroscience education.',
+      category: 'Seminars & Guest Lectures',
+      event_date: '2026-11-15',
+      start_time: '10:00 AM',
+      end_time: '01:00 PM',
+      venue: 'Saidu Medical College Main Auditorium',
+      is_virtual: false,
+      organizer: 'SIGN SMC Chapter',
+      cover_image_url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
+      registration_url: 'https://forms.gle/jzUr115noQ1fDNdS8',
+      is_published: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: null,
+    },
+    {
+      id: 'demo-evt-2',
+      title: 'Neuro-Anatomy & Stroke Localization Case Discussion',
+      description: 'Interactive clinicopathological case discussion on acute ischemic stroke localization and thrombolytic decision-making.',
+      category: 'Case Discussions',
+      event_date: '2026-11-28',
+      start_time: '02:00 PM',
+      end_time: '04:00 PM',
+      venue: 'SGTH Department of Neurology Conference Room',
+      is_virtual: false,
+      organizer: 'SIGN Academic Board',
+      cover_image_url: 'https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&q=80&w=800',
+      registration_url: 'https://forms.gle/jzUr115noQ1fDNdS8',
+      is_published: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      created_by: null,
+    },
+  ];
+
+  const fetchEvents = async () => {
+    setIsLoading(true);
+    if (!isSupabaseConfigured) {
+      setEvents(DEMO_EVENTS);
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('event_date', { ascending: false });
+
+      if (error) {
+        console.error('[SIGN Admin Events] Error:', error.message);
+      } else if (data) {
+        setEvents(data as EventItem[]);
+      }
+    } catch (err) {
+      console.error('[SIGN Admin Events] Unexpected error:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const openCreateModal = () => {
+    setEditingEvent(null);
+    setTitle('');
+    setDescription('');
+    setCategory('Seminars & Guest Lectures');
+    setEventDate(new Date().toISOString().split('T')[0]);
+    setStartTime('10:00');
+    setEndTime('12:00');
+    setVenue('Saidu Medical College Auditorium');
+    setIsVirtual(false);
+    setOrganizer('SIGN SMC Chapter');
+    setCoverImageUrl('');
+    setRegistrationUrl('');
+    setIsPublished(false);
+    setFormError(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (ev: EventItem) => {
+    setEditingEvent(ev);
+    setTitle(ev.title);
+    setDescription(ev.description);
+    setCategory(ev.category);
+    setEventDate(ev.event_date);
+    setStartTime(ev.start_time?.slice(0, 5) || '');
+    setEndTime(ev.end_time?.slice(0, 5) || '');
+    setVenue(ev.venue);
+    setIsVirtual(ev.is_virtual);
+    setOrganizer(ev.organizer);
+    setCoverImageUrl(ev.cover_image_url || '');
+    setRegistrationUrl(ev.registration_url || '');
+    setIsPublished(ev.is_published);
+    setFormError(null);
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!title.trim() || !description.trim() || !eventDate || !venue.trim()) {
+      setFormError('Please fill in all mandatory fields (Title, Description, Date, Venue).');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      if (!isSupabaseConfigured) {
+        throw new Error('Supabase is not configured yet. Add credentials in .env to save to database.');
+      }
+
+      const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        event_date: eventDate,
+        start_time: startTime || null,
+        end_time: endTime || null,
+        venue: venue.trim(),
+        is_virtual: isVirtual,
+        organizer: organizer.trim(),
+        cover_image_url: coverImageUrl.trim() || null,
+        registration_url: registrationUrl.trim() || null,
+        is_published: isPublished,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (!isSupabaseConfigured) {
+        if (editingEvent) {
+          setEvents((prev) =>
+            prev.map((e) =>
+              e.id === editingEvent.id
+                ? { ...e, ...payload, cover_image_url: payload.cover_image_url || e.cover_image_url }
+                : e
+            )
+          );
+        } else {
+          const newEv: EventItem = {
+            id: `dev-evt-${Date.now()}`,
+            ...payload,
+            created_by: user?.id || null,
+            cover_image_url: payload.cover_image_url || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
+            created_at: new Date().toISOString(),
+          };
+          setEvents((prev) => [newEv, ...prev]);
+        }
+        setIsModalOpen(false);
+        return;
+      }
+
+      if (editingEvent) {
+        const { error } = await supabase
+          .from('events')
+          .update(payload)
+          .eq('id', editingEvent.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('events').insert({
+          ...payload,
+          created_by: user?.id,
+        });
+        if (error) throw error;
+      }
+
+      setIsModalOpen(false);
+      await fetchEvents();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error saving event';
+      setFormError(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const togglePublish = async (ev: EventItem) => {
+    if (!isSupabaseConfigured) {
+      setEvents((prev) =>
+        prev.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e))
+      );
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('events')
+        .update({ is_published: !ev.is_published, updated_at: new Date().toISOString() })
+        .eq('id', ev.id);
+
+      if (error) throw error;
+      setEvents(events.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e)));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error updating publication status';
+      alert(msg);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this event? This action cannot be reversed.')) {
+      return;
+    }
+
+    if (!isSupabaseConfigured) {
+      setEvents((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
+      setEvents(events.filter((e) => e.id !== id));
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error deleting event';
+      alert(msg);
+    }
+  };
+
+  const filteredEvents = events.filter((ev) => {
+    const matchesSearch =
+      ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ev.venue.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter === 'All' || ev.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
+  return (
+    <div className="p-6 sm:p-10 max-w-7xl w-full mx-auto space-y-6">
+      {/* Page Title & Action Bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wider text-teal-400 block mb-1">
+            Event Management Suite
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
+            Academic Activities & Seminars
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Create, publish, and manage neurology seminars, clinical case clubs, and community drives.
+          </p>
+        </div>
+
+        <button
+          onClick={openCreateModal}
+          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/30"
+        >
+          <Plus className="w-4 h-4" />
+          Create New Event
+        </button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search events by title or venue..."
+            className="w-full pl-10 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <Filter className="w-4 h-4 text-slate-400 flex-shrink-0" />
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
+          >
+            <option value="All">All Categories</option>
+            {categories.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Events Table / Card List */}
+      {isLoading ? (
+        <div className="p-12 text-center">
+          <div className="w-8 h-8 border-3 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-xs text-slate-400">Loading events catalog...</p>
+        </div>
+      ) : filteredEvents.length > 0 ? (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-semibold">
+                <tr>
+                  <th className="py-3.5 px-4">Event Details</th>
+                  <th className="py-3.5 px-4">Category</th>
+                  <th className="py-3.5 px-4">Date & Time</th>
+                  <th className="py-3.5 px-4">Venue</th>
+                  <th className="py-3.5 px-4 text-center">Status</th>
+                  <th className="py-3.5 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800 text-slate-300">
+                {filteredEvents.map((ev) => (
+                  <tr key={ev.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="py-4 px-4 max-w-xs">
+                      <div className="font-bold text-white text-sm line-clamp-1">{ev.title}</div>
+                      <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{ev.description}</p>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-800 text-teal-400 border border-slate-700">
+                        {ev.category}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <div className="text-slate-200 font-medium">{ev.event_date}</div>
+                      {ev.start_time && (
+                        <span className="text-[11px] text-slate-400">
+                          {ev.start_time.slice(0, 5)} - {ev.end_time?.slice(0, 5) || ''}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 max-w-[180px]">
+                      <div className="flex items-center gap-1.5 truncate" title={ev.venue}>
+                        {ev.is_virtual ? (
+                          <Video className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0" />
+                        ) : (
+                          <MapPin className="w-3.5 h-3.5 text-teal-400 flex-shrink-0" />
+                        )}
+                        <span className="truncate">{ev.venue}</span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => togglePublish(ev)}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border transition-colors ${
+                          ev.is_published
+                            ? 'bg-emerald-950 text-emerald-300 border-emerald-700'
+                            : 'bg-slate-800 text-slate-400 border-slate-700'
+                        }`}
+                        title="Click to toggle publish status"
+                      >
+                        {ev.is_published ? (
+                          <>
+                            <Eye className="w-3 h-3 text-emerald-400" />
+                            Published
+                          </>
+                        ) : (
+                          <>
+                            <EyeOff className="w-3 h-3 text-slate-400" />
+                            Draft
+                          </>
+                        )}
+                      </button>
+                    </td>
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditModal(ev)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                          title="Edit Event"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(ev.id)}
+                          className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors"
+                          title="Delete Event"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+          <Calendar className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+          <h3 className="text-base font-bold text-white">No Events Found</h3>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            No events match your current filter criteria or have been created in the database yet.
+          </p>
+          <button
+            onClick={openCreateModal}
+            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-teal-400 hover:bg-teal-300 transition-colors"
+          >
+            Create First Event
+          </button>
+        </div>
+      )}
+
+      {/* Modal Dialog for Event Creation & Editing */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
+              <h3 className="text-lg font-bold text-white">
+                {editingEvent ? 'Edit Academic Event' : 'Schedule New Event'}
+              </h3>
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {formError && (
+              <div className="mb-4 p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>{formError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSave} className="space-y-4 text-xs">
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Event Title <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Clinical Neurology Case Conference: Status Epilepticus"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Category</label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as EventCategory)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  >
+                    {categories.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Event Date <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Start Time</label>
+                  <input
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">End Time</label>
+                  <input
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Venue / Meeting Info <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={venue}
+                    onChange={(e) => setVenue(e.target.value)}
+                    placeholder="e.g. Saidu Medical College Auditorium or Zoom"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Organizer</label>
+                  <input
+                    type="text"
+                    value={organizer}
+                    onChange={(e) => setOrganizer(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Description & Agenda <span className="text-rose-400">*</span>
+                </label>
+                <textarea
+                  rows={4}
+                  required
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Outline the session agenda, faculty lead, target student year, and learning objectives..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Cover Image URL (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={coverImageUrl}
+                    onChange={(e) => setCoverImageUrl(e.target.value)}
+                    placeholder="https://... image link"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Registration Link (Optional)
+                  </label>
+                  <input
+                    type="url"
+                    value={registrationUrl}
+                    onChange={(e) => setRegistrationUrl(e.target.value)}
+                    placeholder="https://forms.gle/... or meeting link"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-6 pt-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isVirtual}
+                    onChange={(e) => setIsVirtual(e.target.checked)}
+                    className="w-4 h-4 rounded text-teal-500 bg-slate-950 border-slate-800"
+                  />
+                  <span className="text-slate-300">Virtual / Online Meeting</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isPublished}
+                    onChange={(e) => setIsPublished(e.target.checked)}
+                    className="w-4 h-4 rounded text-teal-500 bg-slate-950 border-slate-800"
+                  />
+                  <span className="text-slate-300 font-semibold text-teal-300">
+                    Publish immediately to Public Website
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="px-4 py-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2.5 rounded-xl text-slate-950 font-bold bg-gradient-to-r from-teal-400 to-cyan-300 hover:from-teal-300 hover:to-cyan-200 disabled:opacity-50 transition-all shadow-md"
+                >
+                  {isSaving ? 'Saving...' : editingEvent ? 'Save Changes' : 'Create Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};

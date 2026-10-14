@@ -1,0 +1,68 @@
+import React from 'react';
+import logoTransparent from '../../assets/sign-smc-logo-transparent.png';
+import logoWhite from '../../assets/sign-smc-logo-white.png';
+
+interface SignLogoProps {
+  variant?: 'full' | 'icon' | 'monogram';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+  inverted?: boolean;
+}
+
+export const SignLogo: React.FC<SignLogoProps> = ({
+  variant = 'full',
+  size = 'md',
+  className = '',
+  inverted = false,
+}) => {
+  const sizeMap = {
+    sm: { imgClass: 'h-10 w-auto', text: 'text-base', sub: 'text-[9px]' },
+    md: { imgClass: 'h-12 w-auto', text: 'text-xl', sub: 'text-[10px]' },
+    lg: { imgClass: 'h-16 w-auto', text: 'text-2xl', sub: 'text-xs' },
+    xl: { imgClass: 'h-24 w-auto', text: 'text-4xl', sub: 'text-sm' },
+  };
+
+  const dim = sizeMap[size];
+  const logoSrc = inverted ? logoWhite : logoTransparent;
+
+  const emblem = (
+    <div className="relative flex-shrink-0 flex items-center justify-center transition-transform duration-300 hover:scale-105">
+      <img
+        src={logoSrc}
+        alt="SIGN Neuroscience Emblem"
+        aria-label="SIGN Neuroscience Emblem"
+        className={`${dim.imgClass} object-contain drop-shadow-sm select-none`}
+        loading="eager"
+      />
+    </div>
+  );
+
+  if (variant === 'icon') {
+    return <div className={`inline-flex items-center ${className}`}>{emblem}</div>;
+  }
+
+  return (
+    <div className={`inline-flex items-center gap-3 select-none ${className}`}>
+      {emblem}
+      <div className="flex flex-col leading-tight">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`font-black tracking-wider ${dim.text} ${
+              inverted ? 'text-white' : 'text-[#016533]'
+            }`}
+          >
+            SIGN-SMC
+          </span>
+        </div>
+        <span
+          className={`font-medium tracking-wide ${dim.sub} ${
+            inverted ? 'text-emerald-100/80' : 'text-slate-600'
+          }`}
+        >
+          Student Interest Group in Neurology
+        </span>
+      </div>
+    </div>
+  );
+};
+

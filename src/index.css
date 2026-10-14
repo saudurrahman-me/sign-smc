@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-brand-green: #016533;
+    --color-brand-green-dark: #031D12;
+    --color-brand-green-mid: #059669;
+    --color-brand-green-light: #10B981;
+    --color-brand-glow: rgba(1, 101, 51, 0.25);
+    --color-navy-dark: #031D12;
+    --color-navy: #052919;
+    --color-navy-light: #0B3A24;
+    --color-teal: #016533;
+    --color-teal-light: #10B981;
+    --color-cyan: #059669;
+    --color-cyan-glow: rgba(1, 101, 51, 0.2);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    color-scheme: light;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #F8FAFC;
+    color: #0F172A;
+    overflow-x: hidden;
+  }
+
+  /* Focus visible accessibility styling */
+  :focus-visible {
+    outline: 2px solid #016533;
+    outline-offset: 2px;
+  }
+}
+
+/* Neural Network Background Pattern - Official SIGN-SMC Dark Green */
+.bg-neural-pattern {
+  background-color: #031D12;
+  background-image: 
+    radial-gradient(circle at 20% 30%, rgba(1, 101, 51, 0.45) 0%, transparent 45%),
+    radial-gradient(circle at 80% 70%, rgba(16, 185, 129, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(5, 150, 105, 0.15) 0%, transparent 55%),
+    radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 32px 32px;
+}
+
+/* Neural Network Background Pattern - Refined Light Green for Front Page */
+.bg-neural-light {
+  background-color: #EBF7EE;
+  background-image: 
+    radial-gradient(circle at 15% 20%, rgba(1, 101, 51, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(16, 185, 129, 0.12) 0%, transparent 50%),
+    radial-gradient(circle at 50% 40%, rgba(5, 150, 105, 0.06) 0%, transparent 60%),
+    radial-gradient(rgba(1, 101, 51, 0.08) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 28px 28px;
+}
+
+.bg-medical-mesh {
+  background-color: #F8FAF9;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(1, 101, 51, 0.05) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.06) 0px, transparent 50%);
+}
+
+/* Glassmorphism Classes */
+.glass-nav {
+  background: rgba(3, 29, 18, 0.94);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(1, 101, 51, 0.12);
+}
+
+.glass-card-dark {
+  background: rgba(5, 36, 22, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(16, 185, 129, 0.18);
+}
