@@ -27,13 +27,19 @@ export const AdminApplicationsPage: React.FC = () => {
   const DEMO_APPLICATIONS: MembershipApplication[] = [
     {
       id: 'demo-app-1',
-      user_id: 'user-app-1',
+      user_id: 'dev-applicant-id',
       full_name: 'Zaryab Khan',
       email: 'zaryab.smc@student.edu.pk',
-      phone: '+92 300 1234567',
-      mbbs_year: '3rd Year MBBS',
+      phone: '0312-9876543',
+      mbbs_year: 'MBBS - 3rd Year',
       student_id: 'SMC-2023-089',
-      motivation: 'Passionate about clinical neurology, stroke ward clerkships, and student-led neuroscience awareness campaigns.',
+      college_name: 'Saidu Medical College',
+      degree: 'MBBS',
+      year_of_study: '3rd Year',
+      expected_graduation_year: '2028',
+      payment_proof_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600',
+      previous_experience: 'Active member of SMC Academic Society. Organized college neurology trivia and stroke awareness camp.',
+      motivation: 'Passionate about clinical neurology, stroke ward clerkships, and student-led neuroscience research.',
       research_interests: 'Acute ischemic stroke, neuro-epidemiology in Malakand division',
       agreed_to_terms: true,
       status: 'pending',
@@ -48,14 +54,20 @@ export const AdminApplicationsPage: React.FC = () => {
       user_id: 'user-app-2',
       full_name: 'Mahnoor Bibi',
       email: 'mahnoor.smc@student.edu.pk',
-      phone: '+92 301 9876543',
-      mbbs_year: '4th Year MBBS',
+      phone: '0301-9876543',
+      mbbs_year: 'MBBS - 4th Year',
       student_id: 'SMC-2022-045',
+      college_name: 'Saidu Medical College',
+      degree: 'MBBS',
+      year_of_study: '4th Year',
+      expected_graduation_year: '2027',
+      payment_proof_url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&q=80&w=600',
+      previous_experience: 'Volunteer at SGTH Clinical Research Unit, Swat.',
       motivation: 'Eager to contribute to neurological case reporting, academic research, and community health outreaches in Swat.',
       research_interests: 'Epilepsy genetics, pediatric neurological disorders',
       agreed_to_terms: true,
       status: 'approved',
-      reviewer_notes: 'Academic standing verified by Faculty Board. Welcome to SIGN.',
+      reviewer_notes: 'Academic standing verified by Faculty Board. Payment proof confirmed. Welcome to SIGN.',
       reviewed_by: 'dev-admin-id',
       reviewed_at: new Date(Date.now() - 86400000).toISOString(),
       created_at: new Date(Date.now() - 86400000 * 5).toISOString(),
@@ -65,11 +77,31 @@ export const AdminApplicationsPage: React.FC = () => {
 
   const fetchApplications = async () => {
     setIsLoading(true);
+
+    // Merge session storage demo application if present
+    let localSubmissions: MembershipApplication[] = [];
+    try {
+      const stored = sessionStorage.getItem('sign_user_application');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id) {
+          localSubmissions = [parsed as MembershipApplication];
+        }
+      }
+    } catch {
+      // ignore
+    }
+
     if (!isSupabaseConfigured) {
-      setApplications(DEMO_APPLICATIONS);
+      const merged = [
+        ...localSubmissions,
+        ...DEMO_APPLICATIONS.filter((d) => !localSubmissions.some((l) => l.id === d.id)),
+      ];
+      setApplications(merged);
       setIsLoading(false);
       return;
     }
+
     try {
       const { data, error } = await supabase
         .from('membership_applications')
@@ -78,11 +110,17 @@ export const AdminApplicationsPage: React.FC = () => {
 
       if (error) {
         console.error('[SIGN Admin Applications] Error:', error.message);
+        setApplications(DEMO_APPLICATIONS);
       } else if (data) {
-        setApplications(data as MembershipApplication[]);
+        const merged = [
+          ...localSubmissions.filter((l) => !data.some((d) => d.id === l.id || d.user_id === l.user_id)),
+          ...(data as MembershipApplication[]),
+        ];
+        setApplications(merged);
       }
     } catch (err) {
       console.error('[SIGN Admin Applications] Unexpected error:', err);
+      setApplications(DEMO_APPLICATIONS);
     } finally {
       setIsLoading(false);
     }
@@ -103,21 +141,59 @@ export const AdminApplicationsPage: React.FC = () => {
 
     try {
       const timestamp = new Date().toISOString();
+      const isDevSession = !isSupabaseConfigured || user.id.startsWith('dev-');
 
-      if (!isSupabaseConfigured || user.id.startsWith('dev-')) {
-        setApplications(
-          applications.map((a) =>
-            a.id === selectedApp.id
-              ? {
-                  ...a,
+      if (isDevSession) {
+        // Update local list
+        const updatedList = applications.map((a) =>
+          a.id === selectedApp.id
+            ? {
+                ...a,
+                status: newStatus,
+                reviewer_notes: reviewerNotes.trim() || null,
+                reviewed_by: user.id,
+                reviewed_at: timestamp,
+              }
+            : a
+        );
+        setApplications(updatedList);
+
+        // Update session storage application
+        try {
+          const stored = sessionStorage.getItem('sign_user_application');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.id === selectedApp.id) {
+              sessionStorage.setItem(
+                'sign_user_application',
+                JSON.stringify({
+                  ...parsed,
                   status: newStatus,
                   reviewer_notes: reviewerNotes.trim() || null,
-                  reviewed_by: user.id,
-                  reviewed_at: timestamp,
-                }
-              : a
-          )
-        );
+                })
+              );
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // If approved in dev mode, also elevate the applicant's profile to member in persisted profiles
+        if (newStatus === 'approved') {
+          try {
+            const storedProfiles = sessionStorage.getItem('sign_persisted_profiles');
+            if (storedProfiles) {
+              const parsedProfiles = JSON.parse(storedProfiles);
+              const elevated = parsedProfiles.map((p: any) =>
+                p.id === selectedApp.user_id ? { ...p, role: 'member' } : p
+              );
+              sessionStorage.setItem('sign_persisted_profiles', JSON.stringify(elevated));
+            }
+          } catch {
+            // ignore
+          }
+        }
+
         setSelectedApp(null);
         setIsDeciding(false);
         return;
@@ -136,20 +212,41 @@ export const AdminApplicationsPage: React.FC = () => {
 
       if (error) throw error;
 
-      // Also record audit log entry
-      await supabase.from('audit_logs').insert({
-        actor_id: user.id,
-        actor_email: user.email,
-        action: `membership_application_${newStatus}`,
-        resource_type: 'membership_applications',
-        resource_id: selectedApp.id,
-        details: {
-          applicant_email: selectedApp.email,
-          previous_status: selectedApp.status,
-          new_status: newStatus,
-          notes: reviewerNotes.trim(),
-        },
-      });
+      // AUTOMATIC PRIVILEGE ELEVATION: When approved, upgrade profile role to 'member'
+      if (newStatus === 'approved') {
+        try {
+          const { error: profileError } = await supabase
+            .from('profiles')
+            .update({ role: 'member', updated_at: timestamp })
+            .eq('id', selectedApp.user_id);
+
+          if (profileError) {
+            console.warn('[SIGN Admin] Notice: Could not update profile role automatically:', profileError.message);
+          }
+        } catch (profileErr) {
+          console.warn('[SIGN Admin] Profile role elevation notice:', profileErr);
+        }
+      }
+
+      // Record audit log entry
+      try {
+        await supabase.from('audit_logs').insert({
+          actor_id: user.id,
+          actor_email: user.email,
+          action: `membership_application_${newStatus}`,
+          resource_type: 'membership_applications',
+          resource_id: selectedApp.id,
+          details: {
+            applicant_email: selectedApp.email,
+            previous_status: selectedApp.status,
+            new_status: newStatus,
+            notes: reviewerNotes.trim(),
+            elevated_role: newStatus === 'approved' ? 'member' : undefined,
+          },
+        });
+      } catch (auditErr) {
+        console.warn('[SIGN Admin] Audit log notice:', auditErr);
+      }
 
       // Update state locally
       setApplications(
@@ -281,9 +378,10 @@ export const AdminApplicationsPage: React.FC = () => {
               <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 uppercase font-semibold">
                 <tr>
                   <th className="py-3.5 px-4">Applicant</th>
-                  <th className="py-3.5 px-4">Class Stage</th>
-                  <th className="py-3.5 px-4">Contact</th>
-                  <th className="py-3.5 px-4">Submitted Date</th>
+                  <th className="py-3.5 px-4">Institution & Stage</th>
+                  <th className="py-3.5 px-4">Contact (WhatsApp)</th>
+                  <th className="py-3.5 px-4">Fee Proof</th>
+                  <th className="py-3.5 px-4">Submitted</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                   <th className="py-3.5 px-4 text-right">Review</th>
                 </tr>
@@ -296,13 +394,26 @@ export const AdminApplicationsPage: React.FC = () => {
                       <div className="text-[11px] text-slate-400 truncate">{app.email}</div>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
-                      <span className="font-medium text-slate-200">{app.mbbs_year}</span>
-                      {app.student_id && (
-                        <span className="text-[10px] text-slate-500 block">ID: {app.student_id}</span>
-                      )}
+                      <span className="font-medium text-slate-200">
+                        {app.degree || 'MBBS'} • {app.year_of_study || app.mbbs_year}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block">
+                        {app.college_name || 'Saidu Medical College'}
+                      </span>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-slate-400">
                       <div>{app.phone}</div>
+                    </td>
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      {app.payment_proof_url ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          Rs. 300 Paid
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-950 text-amber-300 border border-amber-800">
+                          Unverified
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap text-slate-400">
                       {new Date(app.created_at).toLocaleDateString()}
@@ -313,10 +424,10 @@ export const AdminApplicationsPage: React.FC = () => {
                     <td className="py-4 px-4 text-right whitespace-nowrap">
                       <button
                         onClick={() => openReviewModal(app)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 border border-purple-500/30 transition-all"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-purple-500/15 text-purple-300 hover:bg-purple-500/25 border border-purple-500/30 transition-all cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
-                        Inspect & Decide
+                        Inspect Dossier
                       </button>
                     </td>
                   </tr>
@@ -341,8 +452,8 @@ export const AdminApplicationsPage: React.FC = () => {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
               <div>
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                  Application Dossier
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block">
+                  Official Membership Application Dossier
                 </span>
                 <h3 className="text-xl font-bold text-white mt-0.5">{selectedApp.full_name}</h3>
               </div>
@@ -357,35 +468,73 @@ export const AdminApplicationsPage: React.FC = () => {
             <div className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block font-semibold mb-1">Email & Phone</span>
-                  <span className="text-slate-200 font-medium">{selectedApp.email}</span>
-                  <span className="text-slate-400 block mt-0.5">{selectedApp.phone}</span>
+                  <span className="text-slate-400 block font-semibold mb-1">Email & WhatsApp</span>
+                  <span className="text-slate-200 font-medium block">{selectedApp.email}</span>
+                  <span className="text-emerald-400 font-mono block mt-0.5">{selectedApp.phone}</span>
                 </div>
                 <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="text-slate-400 block font-semibold mb-1">Class & Registration</span>
-                  <span className="text-slate-200 font-medium">{selectedApp.mbbs_year}</span>
+                  <span className="text-slate-400 block font-semibold mb-1">Institution & Degree</span>
+                  <span className="text-slate-200 font-medium block">
+                    {selectedApp.college_name || 'Saidu Medical College'}
+                  </span>
                   <span className="text-slate-400 block mt-0.5">
-                    {selectedApp.student_id ? `Reg ID: ${selectedApp.student_id}` : 'None provided'}
+                    {selectedApp.degree || 'MBBS'} • {selectedApp.year_of_study || selectedApp.mbbs_year}
+                    {selectedApp.expected_graduation_year ? ` (Grad: ${selectedApp.expected_graduation_year})` : ''}
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                <span className="text-slate-400 block font-semibold mb-1">
-                  Statement of Interest & Motivation
-                </span>
-                <p className="text-slate-200 leading-relaxed italic mt-1">
-                  "{selectedApp.motivation}"
-                </p>
-              </div>
+              {/* Payment Proof Preview */}
+              {selectedApp.payment_proof_url && (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-400 font-semibold">
+                      Easypaisa Membership Fee Proof (Rs. 300)
+                    </span>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                      Payment Screenshot Attached
+                    </span>
+                  </div>
+                  <div className="rounded-xl overflow-hidden border border-slate-800 bg-slate-900/50 p-2">
+                    <a
+                      href={selectedApp.payment_proof_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block group relative"
+                    >
+                      <img
+                        src={selectedApp.payment_proof_url}
+                        alt="Easypaisa Payment Proof"
+                        className="max-h-56 mx-auto rounded-lg object-contain bg-black/40 group-hover:opacity-90 transition-opacity"
+                      />
+                      <span className="text-[11px] text-purple-400 hover:text-purple-300 font-semibold block text-center mt-2 underline">
+                        Open Full Screenshot in New Tab &rarr;
+                      </span>
+                    </a>
+                  </div>
+                </div>
+              )}
 
-              {selectedApp.research_interests && (
+              {/* Previous Club Experience */}
+              {selectedApp.previous_experience && (
                 <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
                   <span className="text-slate-400 block font-semibold mb-1">
-                    Research Topics of Interest
+                    Previous Club Activities & Leadership Experience
                   </span>
-                  <p className="text-slate-200 leading-relaxed">
-                    {selectedApp.research_interests}
+                  <p className="text-slate-200 leading-relaxed italic">
+                    "{selectedApp.previous_experience}"
+                  </p>
+                </div>
+              )}
+
+              {/* Statement of Motivation */}
+              {selectedApp.motivation && (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 block font-semibold mb-1">
+                    Statement / Application Record
+                  </span>
+                  <p className="text-slate-300 leading-relaxed text-[11.5px]">
+                    {selectedApp.motivation}
                   </p>
                 </div>
               )}
@@ -399,7 +548,7 @@ export const AdminApplicationsPage: React.FC = () => {
                   rows={3}
                   value={reviewerNotes}
                   onChange={(e) => setReviewerNotes(e.target.value)}
-                  placeholder="Provide internal feedback or formal reason for committee decision..."
+                  placeholder="Provide internal notes, fee verification confirmation, or message to the student..."
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-purple-500"
                 />
               </div>
@@ -424,7 +573,7 @@ export const AdminApplicationsPage: React.FC = () => {
                     disabled={isDeciding}
                     className="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md disabled:opacity-50"
                   >
-                    Approve for Membership
+                    Approve & Elevate to Member
                   </button>
                 </div>
               </div>

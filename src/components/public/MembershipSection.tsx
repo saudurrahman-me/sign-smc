@@ -1,47 +1,72 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   UserCheck,
   Lock,
   CheckCircle2,
   AlertCircle,
   Clock,
-  Send,
-  ExternalLink,
   FileText,
+  CreditCard,
+  ArrowRight,
+  Eye,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { MembershipApplication } from '../../types/database.types';
-import { OFFICIAL_MEMBERSHIP_FORM_URL } from '../../data/fallback-content';
+import { MembershipApplicationModal } from './MembershipApplicationModal';
+import { LoginRequiredModal } from './LoginRequiredModal';
 
 export const MembershipSection: React.FC = () => {
-  const { user, profile, isConfigured } = useAuth();
+  const { user } = useAuth();
+  const location = useLocation();
+
   const [existingApp, setExistingApp] = useState<MembershipApplication | null>(null);
   const [isLoadingApp, setIsLoadingApp] = useState<boolean>(true);
 
-  // Form Fields
-  const [fullName, setFullName] = useState<string>('');
-  const [phone, setPhone] = useState<string>('');
-  const [mbbsYear, setMbbsYear] = useState<string>('3rd Year');
-  const [studentId, setStudentId] = useState<string>('');
-  const [motivation, setMotivation] = useState<string>('');
-  const [researchInterests, setResearchInterests] = useState<string>('');
-  const [agreedToTerms, setAgreedToTerms] = useState<boolean>(false);
+  // Modals state
+  const [isApplyModalOpen, setIsApplyModalOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState<boolean>(false);
 
-  // Form Submission State
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [formSuccess, setFormSuccess] = useState<string | null>(null);
+  // Auto-open application modal if coming from login with apply=true
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.get('openApply') === 'true' && user) {
+      setIsApplyModalOpen(true);
+    }
+  }, [location.search, user]);
 
-  // Load existing user application if signed in
+  // Load existing user application
   useEffect(() => {
     let isMounted = true;
+
     const fetchExistingApplication = async () => {
-      if (!user || !isSupabaseConfigured) {
+      if (!user) {
         setIsLoadingApp(false);
         return;
       }
+
+      // Check dev session storage first
+      try {
+        const stored = sessionStorage.getItem('sign_user_application');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && (parsed.user_id === user.id || user.id.startsWith('dev-'))) {
+            setExistingApp(parsed as MembershipApplication);
+            setIsLoadingApp(false);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      if (!isSupabaseConfigured) {
+        setIsLoadingApp(false);
+        return;
+      }
+
       try {
         const { data, error } = await supabase
           .from('membership_applications')
@@ -63,87 +88,10 @@ export const MembershipSection: React.FC = () => {
 
     fetchExistingApplication();
 
-    if (profile?.full_name) {
-      setFullName(profile.full_name);
-    }
     return () => {
       isMounted = false;
     };
-  }, [user, profile]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    setFormSuccess(null);
-
-    if (!user) {
-      setFormError('Authentication required. Please sign in or create an account first.');
-      return;
-    }
-
-    if (!fullName.trim()) {
-      setFormError('Please provide your full legal name as registered at SMC.');
-      return;
-    }
-
-    if (!phone.trim()) {
-      setFormError('Please enter a valid contact phone number.');
-      return;
-    }
-
-    if (!motivation.trim() || motivation.trim().length < 30) {
-      setFormError('Please describe your interest in neurology (at least 30 characters).');
-      return;
-    }
-
-    if (!agreedToTerms) {
-      setFormError('You must review and agree to the membership privacy notice and terms.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      if (!isConfigured) {
-        throw new Error(
-          'Supabase database is not configured. Please supply VITE_SUPABASE_URL in your .env configuration.'
-        );
-      }
-
-      const { data, error } = await supabase
-        .from('membership_applications')
-        .insert({
-          user_id: user.id,
-          full_name: fullName.trim(),
-          email: user.email!,
-          phone: phone.trim(),
-          mbbs_year: mbbsYear,
-          student_id: studentId.trim() || null,
-          motivation: motivation.trim(),
-          research_interests: researchInterests.trim() || null,
-          agreed_to_terms: true,
-          status: 'pending',
-        })
-        .select()
-        .single();
-
-      if (error) {
-        if (error.code === '23505') {
-          setFormError('You have already submitted a membership application.');
-        } else {
-          setFormError(error.message);
-        }
-      } else {
-        setExistingApp(data as MembershipApplication);
-        setFormSuccess('Your application has been successfully submitted and is under review!');
-      }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An unexpected error occurred.';
-      setFormError(message);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  }, [user]);
 
   const handleWithdraw = async () => {
     if (!existingApp || !user) return;
@@ -153,6 +101,17 @@ export const MembershipSection: React.FC = () => {
     if (!confirmWithdraw) return;
 
     try {
+      if (!isSupabaseConfigured || user.id.startsWith('dev-')) {
+        const updated = { ...existingApp, status: 'withdrawn' as const };
+        setExistingApp(updated);
+        try {
+          sessionStorage.setItem('sign_user_application', JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return;
+      }
+
       const { error } = await supabase
         .from('membership_applications')
         .update({ status: 'withdrawn', updated_at: new Date().toISOString() })
@@ -170,40 +129,48 @@ export const MembershipSection: React.FC = () => {
     }
   };
 
+  const handleApplyClick = () => {
+    if (!user) {
+      setIsLoginModalOpen(true);
+    } else {
+      setIsApplyModalOpen(true);
+    }
+  };
+
   const statusBadge = (status: string) => {
     switch (status) {
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Approved
+            Approved Member
           </span>
         );
       case 'rejected':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-300">
             <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
             Declined
           </span>
         );
       case 'withdrawn':
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-200 text-slate-700 border border-slate-300">
             Withdrawn
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
             <Clock className="w-3.5 h-3.5 text-amber-600" />
-            Pending Review
+            Pending Admin Review
           </span>
         );
     }
   };
 
   return (
-    <section id="membership" className="py-24 bg-white border-b border-slate-200">
+    <section id="membership" className="py-24 bg-white border-b border-slate-200 relative overflow-hidden">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center max-w-2xl mx-auto mb-12">
@@ -215,299 +182,269 @@ export const MembershipSection: React.FC = () => {
             Apply for Membership
           </h2>
           <p className="mt-2 text-sm sm:text-base text-slate-600 leading-relaxed">
-            Open to MBBS students at Saidu Medical College seeking structured exposure to clinical neurology,
+            Open to MBBS and BDS students at Saidu Medical College seeking structured exposure to clinical neurology,
             journal clubs, and collaborative academic research.
           </p>
         </div>
 
-        {/* State 1: User Already Submitted An Application */}
+        {/* Loading State */}
         {user && isLoadingApp ? (
-          <div className="flex justify-center py-12">
+          <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-3 border-[#016533] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : user && existingApp ? (
-          <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-emerald-50/20 border border-slate-200 p-8 shadow-sm">
+          /* State 1: Logged-in User has ALREADY Applied */
+          <div className="rounded-3xl bg-gradient-to-br from-slate-50 via-white to-emerald-50/20 border border-slate-200 p-6 sm:p-10 shadow-sm space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
               <div>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                  Membership Application Record
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Official Membership Application Record
                 </span>
-                <h3 className="text-xl font-bold text-slate-900 mt-1">
+                <h3 className="text-xl sm:text-2xl font-bold text-slate-900 mt-1">
                   {existingApp.full_name}
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Submitted: {new Date(existingApp.created_at).toLocaleDateString()} • {existingApp.mbbs_year}
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Submitted: {new Date(existingApp.created_at).toLocaleDateString()} •{' '}
+                  {existingApp.college_name || 'Saidu Medical College'}
                 </p>
               </div>
               <div>{statusBadge(existingApp.status)}</div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 my-6 text-xs">
-              <div className="p-4 rounded-xl bg-white border border-slate-200/80">
-                <span className="text-slate-400 block font-semibold mb-1">Email & Contact</span>
-                <span className="text-slate-800 font-medium">{existingApp.email}</span>
-                <span className="text-slate-500 block mt-0.5">{existingApp.phone}</span>
+            {/* Application Overview Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                <span className="text-slate-400 block font-semibold mb-1">Contact WhatsApp</span>
+                <span className="text-slate-800 font-bold block">{existingApp.phone}</span>
+                <span className="text-slate-500 text-[11px] block mt-0.5">{existingApp.email}</span>
               </div>
-              <div className="p-4 rounded-xl bg-white border border-slate-200/80">
-                <span className="text-slate-400 block font-semibold mb-1">Academic Class & ID</span>
-                <span className="text-slate-800 font-medium">{existingApp.mbbs_year}</span>
-                <span className="text-slate-500 block mt-0.5">
-                  {existingApp.student_id ? `Reg: ${existingApp.student_id}` : 'Student ID not recorded'}
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                <span className="text-slate-400 block font-semibold mb-1">Academic Program</span>
+                <span className="text-slate-800 font-bold block">
+                  {existingApp.degree || 'MBBS'} • {existingApp.year_of_study || existingApp.mbbs_year}
+                </span>
+                <span className="text-slate-500 text-[11px] block mt-0.5">
+                  {existingApp.college_name || 'Saidu Medical College'}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-sm">
+                <span className="text-slate-400 block font-semibold mb-1">Payment Status</span>
+                <span className="text-[#016533] font-bold block">Rs. 300 (Easypaisa)</span>
+                <span className="text-slate-500 text-[11px] block mt-0.5">
+                  {existingApp.payment_proof_url ? '✓ Proof screenshot attached' : 'Proof pending'}
                 </span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-white border border-slate-200/80 text-xs mb-6">
-              <span className="text-slate-400 block font-semibold mb-1">Motivation Statement</span>
-              <p className="text-slate-700 leading-relaxed italic">
-                "{existingApp.motivation}"
-              </p>
-            </div>
-
+            {/* Committee Feedback Notice if provided */}
             {existingApp.reviewer_notes && (
-              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-[#016533] mb-6">
-                <span className="font-bold block mb-1">Review Committee Feedback:</span>
-                <p>{existingApp.reviewer_notes}</p>
+              <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-[#016533]">
+                <span className="font-bold block mb-1">Committee Feedback:</span>
+                <p className="text-slate-700 leading-relaxed">{existingApp.reviewer_notes}</p>
               </div>
             )}
 
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
-              <p className="text-xs text-slate-500">
-                Decision notifications are communicated via your registered SMC institutional email.
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-200 text-xs">
+              <p className="text-slate-500 text-[11px]">
+                {existingApp.status === 'approved'
+                  ? 'Congratulations! Your membership is active. You are officially recognized as a member.'
+                  : 'Your application is under evaluation by the SIGN SMC Executive Review Board.'}
               </p>
-              {existingApp.status === 'pending' && (
+
+              <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
-                  onClick={handleWithdraw}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 transition-colors"
+                  type="button"
+                  onClick={() => setIsDetailsModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
-                  Withdraw Application
+                  <Eye className="w-3.5 h-3.5" />
+                  View Details
                 </button>
-              )}
+
+                {existingApp.status === 'pending' && (
+                  <button
+                    type="button"
+                    onClick={handleWithdraw}
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors"
+                  >
+                    Withdraw Application
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        ) : !user ? (
-          /* State 2: Visitor Flow — Official Google Form Application Card */
-          <div className="rounded-2xl bg-[#031D12] text-white p-8 sm:p-12 shadow-2xl border border-emerald-900/50 text-center relative overflow-hidden">
+        ) : (
+          /* State 2 & 3: Button view (Unauthenticated or Logged-in without application) */
+          <div className="rounded-3xl bg-[#031D12] text-white p-8 sm:p-12 shadow-2xl border border-emerald-900/50 text-center relative overflow-hidden">
             {/* Ambient emerald blur */}
             <div className="absolute -top-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
 
-            <div className="max-w-xl mx-auto relative z-10">
-              <div className="w-16 h-16 rounded-2xl bg-[#016533]/40 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-5 shadow-inner">
+            <div className="max-w-xl mx-auto relative z-10 space-y-4">
+              <div className="w-16 h-16 rounded-2xl bg-[#016533]/40 border border-emerald-500/40 text-emerald-300 flex items-center justify-center mx-auto mb-2 shadow-inner">
                 <FileText className="w-8 h-8 text-emerald-400" />
               </div>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 border border-emerald-700/50 text-emerald-300 mb-3">
+
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-950 border border-emerald-700/50 text-emerald-300">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Academic Cohort Enrollment Open
+                Annual Membership Cohort Open
               </span>
-              <h3 className="text-2xl sm:text-3xl font-bold tracking-tight mb-3">
-                Official SIGN SMC Membership Form
+
+              <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                Official SIGN SMC Membership
               </h3>
-              <p className="text-sm text-slate-300 leading-relaxed mb-8 max-w-lg mx-auto">
-                Ready to join the Student Interest Group in Neurology at Saidu Medical College?
-                Complete your official registration via Google Forms or access the student portal.
+
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+                Join our vibrant student community at Saidu Medical College. Get started in medical
+                research, clinical neurology workshops, journal clubs, and student-led scientific publications.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a
-                  href={OFFICIAL_MEMBERSHIP_FORM_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-xl shadow-emerald-950/40 border border-emerald-400/40"
+              {/* Easypaisa Fee Highlight */}
+              <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800/60 max-w-md mx-auto text-xs text-emerald-200/90 text-left space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white flex items-center gap-1.5">
+                    <CreditCard className="w-4 h-4 text-emerald-400" />
+                    Membership Fee: Rs. 300
+                  </span>
+                  <span className="text-[10px] bg-emerald-900/80 text-emerald-300 px-2 py-0.5 rounded border border-emerald-700">
+                    Easypaisa
+                  </span>
+                </div>
+                <p className="text-[11px] text-emerald-300/80">
+                  Account Name: <strong>Waqar Younas</strong> • Number:{' '}
+                  <span className="font-mono font-bold text-white">03179752692</span>
+                </p>
+              </div>
+
+              {/* Main Action Buttons */}
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleApplyClick}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-xl shadow-emerald-950/50 border border-emerald-400/40 transition-all transform hover:-translate-y-0.5 cursor-pointer"
                 >
                   <FileText className="w-4 h-4" />
-                  Fill Official Membership Form
-                  <ExternalLink className="w-4 h-4 ml-0.5" />
-                </a>
-                <Link
-                  to="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-emerald-950/70 hover:bg-emerald-900/60 border border-emerald-800/40 transition-all"
-                >
-                  <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                  Sign In to Member Portal
-                </Link>
+                  Apply for Membership
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </button>
+
+                {!user && (
+                  <Link
+                    to="/login"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-emerald-950/80 hover:bg-emerald-900/80 border border-emerald-800/40 transition-all"
+                  >
+                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                    Sign In
+                  </Link>
+                )}
               </div>
 
               <div className="mt-8 pt-6 border-t border-emerald-950/80 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-emerald-200/70">
-                <span>• Open to All MBBS Classes (SMC)</span>
+                <span>• Open to MBBS & BDS Students</span>
                 <span>• Official Inquiries: signsmc.official@gmail.com</span>
                 <span>• KMU Affiliated Chapter</span>
               </div>
             </div>
           </div>
-        ) : (
-          /* State 3: Authenticated User Application Form */
-          <div className="rounded-2xl bg-white border border-slate-200 p-8 sm:p-10 shadow-sm">
-            <div className="flex items-center justify-between pb-6 mb-6 border-b border-slate-100">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">
-                  MBBS Membership Application
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Authenticated applicant: <span className="font-semibold text-slate-700">{user.email}</span>
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-50 text-[#016533] border border-emerald-200">
-                Verified Account
-              </span>
+        )}
+      </div>
+
+      {/* Modal 1: Native Google Form Replica Popup Sub-Window */}
+      <MembershipApplicationModal
+        isOpen={isApplyModalOpen}
+        onClose={() => setIsApplyModalOpen(false)}
+        onApplicationSubmitted={(newApp) => {
+          setExistingApp(newApp);
+        }}
+      />
+
+      {/* Modal 2: Sign-in Required Prompt for Unauthenticated Visitors */}
+      <LoginRequiredModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
+
+      {/* Modal 3: View Submitted Application Details */}
+      {isDetailsModalOpen && existingApp && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 text-slate-800">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Submitted Application Dossier</h3>
+              <button
+                onClick={() => setIsDetailsModalOpen(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                &times;
+              </button>
             </div>
 
-            {formError && (
-              <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-xs text-red-800 flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <span>{formError}</span>
-              </div>
-            )}
-
-            {formSuccess && (
-              <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-start gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <span>{formSuccess}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="fullName" className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Full Legal Name <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="fullName"
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Dr. / Mr. / Ms. Full Name"
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="phone" className="block text-xs font-bold text-slate-700 mb-1.5">
-                    Contact Phone Number <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    required
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. +92 300 1234567"
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                  />
-                </div>
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-400 block font-semibold mb-1">Full Name & Email</span>
+                <span className="text-slate-900 font-bold block">{existingApp.full_name}</span>
+                <span className="text-slate-600 block">{existingApp.email}</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <label htmlFor="mbbsYear" className="block text-xs font-bold text-slate-700 mb-1.5">
-                    MBBS Class / Training Stage <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="mbbsYear"
-                    value={mbbsYear}
-                    onChange={(e) => setMbbsYear(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                  >
-                    <option value="1st Year">1st Year MBBS</option>
-                    <option value="2nd Year">2nd Year MBBS</option>
-                    <option value="3rd Year">3rd Year MBBS</option>
-                    <option value="4th Year">4th Year MBBS</option>
-                    <option value="Final Year">Final Year MBBS</option>
-                    <option value="House Officer">House Officer</option>
-                    <option value="Faculty/Alumni">Faculty / Alumni</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label htmlFor="studentId" className="block text-xs font-bold text-slate-700 mb-1.5">
-                    SMC Student ID / Registration <span className="text-slate-400 font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    id="studentId"
-                    type="text"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    placeholder="e.g. SMC-2023-XXXX"
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label htmlFor="motivation" className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Statement of Interest & Motivation <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  id="motivation"
-                  required
-                  rows={4}
-                  value={motivation}
-                  onChange={(e) => setMotivation(e.target.value)}
-                  placeholder="Describe your interest in clinical neurology, neuroscience research, or academic society involvement at SMC (minimum 30 characters)..."
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                />
-                <span className="text-[11px] text-slate-400 mt-1 block">
-                  {motivation.length} characters (minimum 30 required)
+              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                <span className="text-slate-400 block font-semibold mb-1">WhatsApp & College</span>
+                <span className="text-slate-900 font-bold block">{existingApp.phone}</span>
+                <span className="text-slate-600 block">
+                  {existingApp.college_name || 'Saidu Medical College'} • {existingApp.degree || 'MBBS'}
+                </span>
+                <span className="text-slate-500 block text-[11px] mt-0.5">
+                  Year of Study: {existingApp.year_of_study || existingApp.mbbs_year} | Expected Grad:{' '}
+                  {existingApp.expected_graduation_year || 'N/A'}
                 </span>
               </div>
 
-              <div>
-                <label htmlFor="researchInterests" className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Research Interests or Topics of Curiosity <span className="text-slate-400 font-normal">(Optional)</span>
-                </label>
-                <input
-                  id="researchInterests"
-                  type="text"
-                  value={researchInterests}
-                  onChange={(e) => setResearchInterests(e.target.value)}
-                  placeholder="e.g. Epilepsy, Stroke epidemiology, Movement disorders, Neuroimaging, Mental health"
-                  className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm focus:border-[#016533] focus:ring-1 focus:ring-[#016533]"
-                />
-              </div>
-
-              {/* Privacy Notice Agreement */}
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    required
-                    checked={agreedToTerms}
-                    onChange={(e) => setAgreedToTerms(e.target.checked)}
-                    className="mt-1 w-4 h-4 rounded text-[#016533] focus:ring-[#016533] border-slate-300"
-                  />
-                  <span className="text-xs text-slate-600 leading-relaxed">
-                    I confirm that I am a student or trainee at Saidu Medical College. I agree that my application data
-                    will be handled strictly for SIGN Chapter academic membership selection in accordance with the
-                    chapter privacy policy and will never be published publicly.
+              {existingApp.previous_experience && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-400 block font-semibold mb-1">
+                    Previous Experience / Roles
                   </span>
-                </label>
-              </div>
+                  <p className="text-slate-700 leading-relaxed">{existingApp.previous_experience}</p>
+                </div>
+              )}
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !agreedToTerms}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 disabled:opacity-50 transition-all shadow-md shadow-emerald-950/20"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-3.5 h-3.5" />
-                      Submit Membership Application
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
+              {existingApp.payment_proof_url && (
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                  <span className="text-slate-400 block font-semibold mb-2">
+                    Easypaisa Payment Proof Receipt
+                  </span>
+                  <a
+                    href={existingApp.payment_proof_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block group"
+                  >
+                    <img
+                      src={existingApp.payment_proof_url}
+                      alt="Payment Proof"
+                      className="max-h-48 rounded-lg object-contain border border-slate-200 bg-white mx-auto shadow-sm group-hover:opacity-90 transition-opacity"
+                    />
+                    <span className="text-[11px] text-[#016533] font-semibold text-center block mt-1.5 group-hover:underline">
+                      Click to view full image &rarr;
+                    </span>
+                  </a>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-2 text-right">
+              <button
+                type="button"
+                onClick={() => setIsDetailsModalOpen(false)}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#015229] transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   );
 };

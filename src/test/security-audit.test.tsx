@@ -3,13 +3,14 @@ import type { UserRole } from '../types/database.types';
 
 describe('Production Readiness & Security Controls Audit', () => {
   describe('1. Role Definition & Boundary Verification', () => {
-    it('defines exactly the four intended roles: super_admin, website_admin, event_manager, member', () => {
-      const allowedRoles: UserRole[] = ['super_admin', 'website_admin', 'event_manager', 'member'];
-      expect(allowedRoles).toHaveLength(4);
+    it('defines the five platform roles: super_admin, website_admin, event_manager, member, applicant', () => {
+      const allowedRoles: UserRole[] = ['super_admin', 'website_admin', 'event_manager', 'member', 'applicant'];
+      expect(allowedRoles).toHaveLength(5);
       expect(allowedRoles).toContain('super_admin');
       expect(allowedRoles).toContain('website_admin');
       expect(allowedRoles).toContain('event_manager');
       expect(allowedRoles).toContain('member');
+      expect(allowedRoles).toContain('applicant');
     });
 
     it('prohibits privilege escalation through ordinary member profile update', () => {

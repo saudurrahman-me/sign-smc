@@ -9,9 +9,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 2. ENUMS & DOMAINS
 DO $$ BEGIN
-    CREATE TYPE user_role_type AS ENUM ('super_admin', 'website_admin', 'event_manager', 'member');
+    CREATE TYPE user_role_type AS ENUM ('super_admin', 'website_admin', 'event_manager', 'member', 'applicant');
 EXCEPTION
-    WHEN duplicate_object THEN null;
+    WHEN duplicate_object THEN
+        ALTER TYPE user_role_type ADD VALUE IF NOT EXISTS 'applicant';
 END $$;
 
 DO $$ BEGIN
@@ -39,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     email TEXT NOT NULL,
     full_name TEXT,
     avatar_url TEXT,
-    role user_role_type NOT NULL DEFAULT 'member',
+    role user_role_type NOT NULL DEFAULT 'applicant',
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
 );
@@ -129,6 +130,12 @@ CREATE TABLE IF NOT EXISTS public.membership_applications (
     phone TEXT NOT NULL,
     mbbs_year TEXT NOT NULL,
     student_id TEXT,
+    college_name TEXT DEFAULT 'Saidu Medical College',
+    degree TEXT DEFAULT 'MBBS',
+    year_of_study TEXT,
+    expected_graduation_year TEXT,
+    payment_proof_url TEXT,
+    previous_experience TEXT,
     motivation TEXT NOT NULL,
     research_interests TEXT,
     agreed_to_terms BOOLEAN NOT NULL DEFAULT false,
@@ -140,6 +147,14 @@ CREATE TABLE IF NOT EXISTS public.membership_applications (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     CONSTRAINT uq_active_application_per_user UNIQUE (user_id)
 );
+
+-- Ensure non-breaking backwards compatibility for existing deployments
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS college_name TEXT;
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS degree TEXT;
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS year_of_study TEXT;
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS expected_graduation_year TEXT;
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS payment_proof_url TEXT;
+ALTER TABLE public.membership_applications ADD COLUMN IF NOT EXISTS previous_experience TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_membership_user ON public.membership_applications(user_id);
 CREATE INDEX IF NOT EXISTS idx_membership_status ON public.membership_applications(status);
@@ -264,7 +279,7 @@ BEGIN
         NEW.id,
         NEW.email,
         COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
-        'member'
+        'applicant'
     )
     ON CONFLICT (id) DO UPDATE
     SET email = EXCLUDED.email;

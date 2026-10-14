@@ -12,6 +12,7 @@ interface AuthContextType {
   isSuperAdmin: boolean;
   isWebsiteAdmin: boolean;
   isEventManager: boolean;
+  isMember: boolean;
   isConfigured: boolean;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: AuthError | Error | null }>;
@@ -76,10 +77,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Initial session retrieval
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
       if (session?.user) {
+        setUser(session.user);
         fetchProfile(session.user.id).finally(() => setIsLoading(false));
       } else {
+        // Fallback to local preview session if present
+        try {
+          const stored = localStorage.getItem('sign_dev_user');
+          if (stored) {
+            const parsed = JSON.parse(stored);
+            if (parsed.user && parsed.profile) {
+              setUser(parsed.user);
+              setProfile(parsed.profile);
+            }
+          }
+        } catch (err) {
+          console.error('[SIGN Dev Auth] Failed to restore demo session:', err);
+        }
         setIsLoading(false);
       }
     });
@@ -89,10 +103,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
-      setUser(newSession?.user ?? null);
       if (newSession?.user) {
+        setUser(newSession.user);
         await fetchProfile(newSession.user.id);
       } else {
+        const stored = localStorage.getItem('sign_dev_user');
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            if (parsed.user && parsed.profile) {
+              setUser(parsed.user);
+              setProfile(parsed.profile);
+              setIsLoading(false);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+        }
+        setUser(null);
         setProfile(null);
       }
       setIsLoading(false);
@@ -169,6 +198,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         title: 'Media & Communication Head',
         email: 'irshadahmad.access@gmail.com',
       },
+      applicant: {
+        name: 'Zaryab Khan',
+        title: 'Registered Student (Applicant)',
+        email: 'zaryab.smc@student.edu.pk',
+      },
     };
 
     const details = roleDetails[selectedRole];
@@ -218,10 +252,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { error };
   };
 
-  const role: UserRole | null = profile?.role ?? (user ? 'member' : null);
+  const role: UserRole | null = profile?.role ?? (user ? 'applicant' : null);
   const isSuperAdmin = role === 'super_admin';
   const isWebsiteAdmin = role === 'website_admin' || isSuperAdmin;
   const isEventManager = role === 'event_manager' || isSuperAdmin;
+  const isMember = role === 'member' || isSuperAdmin || isWebsiteAdmin || isEventManager;
 
   return (
     <AuthContext.Provider
@@ -234,6 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isSuperAdmin,
         isWebsiteAdmin,
         isEventManager,
+        isMember,
         isConfigured: isSupabaseConfigured,
         signIn,
         signUp,

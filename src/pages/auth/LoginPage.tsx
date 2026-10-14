@@ -8,8 +8,14 @@ export const LoginPage: React.FC = () => {
   const { signIn, signUp, resetPassword, devSignIn, isConfigured } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const isApply = searchParams.get('apply') === 'true';
+  const initialMode =
+    location.pathname === '/register' || searchParams.get('mode') === 'signup'
+      ? 'signup'
+      : 'signin';
 
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -17,7 +23,8 @@ export const LoginPage: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
+  const defaultDestination = isApply ? '/?openApply=true#membership' : '/';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || defaultDestination;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,8 +56,9 @@ export const LoginPage: React.FC = () => {
           setErrorMsg(error.message);
         } else {
           setSuccessMsg(
-            'Account registration initiated! If email confirmation is enabled on your Supabase project, check your inbox.'
+            'Account registration successful! You can now sign in below and proceed with your membership application.'
           );
+          setMode('signin');
         }
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);

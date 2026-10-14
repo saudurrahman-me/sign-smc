@@ -67,4 +67,14 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     expect(perms.canManageUserRoles).toBe(false);
     expect(perms.canViewAuditLogs).toBe(false);
   });
+
+  it('Applicant (unapproved account) has no administrative privileges', () => {
+    const perms = getPermissions('applicant');
+    expect(perms.canManageEvents).toBe(false);
+    expect(perms.canManageLeadership).toBe(false);
+    expect(perms.canManageContent).toBe(false);
+    expect(perms.canReviewApplications).toBe(false);
+    expect(perms.canManageUserRoles).toBe(false);
+    expect(perms.canViewAuditLogs).toBe(false);
+  });
 });

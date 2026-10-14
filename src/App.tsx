@@ -30,6 +30,7 @@ export const App: React.FC = () => {
 
           {/* Authentication & User Portal */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<LoginPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route

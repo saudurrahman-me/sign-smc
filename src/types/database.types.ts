@@ -2,7 +2,7 @@
 // Database & Domain Types for SIGN Chapter SMC Swat
 // ==============================================================================
 
-export type UserRole = 'super_admin' | 'website_admin' | 'event_manager' | 'member';
+export type UserRole = 'super_admin' | 'website_admin' | 'event_manager' | 'member' | 'applicant';
 
 export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'withdrawn';
 
@@ -106,6 +106,12 @@ export interface MembershipApplication {
   student_id: string | null;
   motivation: string;
   research_interests: string | null;
+  college_name?: string | null;
+  degree?: string | null;
+  year_of_study?: string | null;
+  expected_graduation_year?: string | null;
+  payment_proof_url?: string | null;
+  previous_experience?: string | null;
   agreed_to_terms: boolean;
   status: ApplicationStatus;
   reviewer_notes: string | null;
