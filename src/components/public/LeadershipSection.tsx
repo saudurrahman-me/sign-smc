@@ -12,6 +12,21 @@ export const LeadershipSection: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchLeadership = async () => {
+      try {
+        const devCached = sessionStorage.getItem('sign_dev_leadership_profiles');
+        if (devCached) {
+          const parsed = JSON.parse(devCached) as LeadershipProfile[];
+          const published = parsed.filter((p) => p.is_published);
+          if (published.length > 0 && isMounted) {
+            setProfiles(published);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       if (!isSupabaseConfigured) {
         setIsLoading(false);
         return;

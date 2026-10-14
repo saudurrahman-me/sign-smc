@@ -73,19 +73,30 @@ export const AdminOverviewPage: React.FC = () => {
         // Fetch applications & users (Super Admin only per RLS)
         if (isSuperAdmin) {
           const { data: appData } = await supabase.from('membership_applications').select('id, status');
-          if (appData && isMounted) {
+          if (appData && isMounted && appData.length > 0) {
             setStats((prev) => ({
               ...prev,
               totalApps: appData.length,
               pendingApps: appData.filter((a) => a.status === 'pending').length,
             }));
+          } else if (user?.id?.startsWith('dev-') && isMounted) {
+            setStats((prev) => ({
+              ...prev,
+              totalApps: 2,
+              pendingApps: 1,
+            }));
           }
 
           const { data: userData } = await supabase.from('profiles').select('id');
-          if (userData && isMounted) {
+          if (userData && isMounted && userData.length > 0) {
             setStats((prev) => ({
               ...prev,
               usersCount: userData.length,
+            }));
+          } else if (user?.id?.startsWith('dev-') && isMounted) {
+            setStats((prev) => ({
+              ...prev,
+              usersCount: 4,
             }));
           }
         }

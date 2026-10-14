@@ -93,8 +93,23 @@ export const AdminEventsPage: React.FC = () => {
     },
   ];
 
+  const isDevSession = !isSupabaseConfigured || Boolean(user?.id?.startsWith('dev-'));
+
   const fetchEvents = async () => {
     setIsLoading(true);
+    if (isDevSession) {
+      try {
+        const stored = sessionStorage.getItem('sign_dev_events');
+        if (stored) {
+          setEvents(JSON.parse(stored));
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     if (!isSupabaseConfigured) {
       setEvents(DEMO_EVENTS);
       setIsLoading(false);
@@ -120,7 +135,7 @@ export const AdminEventsPage: React.FC = () => {
 
   useEffect(() => {
     fetchEvents();
-  }, []);
+  }, [user]);
 
   const openCreateModal = () => {
     setEditingEvent(null);
@@ -169,10 +184,6 @@ export const AdminEventsPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      if (!isSupabaseConfigured) {
-        throw new Error('Supabase is not configured yet. Add credentials in .env to save to database.');
-      }
-
       const payload = {
         title: title.trim(),
         description: description.trim(),
@@ -189,41 +200,55 @@ export const AdminEventsPage: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
 
-      if (!isSupabaseConfigured) {
+      if (isDevSession) {
+        let updatedList: EventItem[];
         if (editingEvent) {
-          setEvents((prev) =>
-            prev.map((e) =>
-              e.id === editingEvent.id
-                ? { ...e, ...payload, cover_image_url: payload.cover_image_url || e.cover_image_url }
-                : e
-            )
+          updatedList = events.map((e) =>
+            e.id === editingEvent.id
+              ? { ...e, ...payload, cover_image_url: payload.cover_image_url || e.cover_image_url }
+              : e
           );
         } else {
           const newEv: EventItem = {
             id: `dev-evt-${Date.now()}`,
             ...payload,
             created_by: user?.id || null,
-            cover_image_url: payload.cover_image_url || 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
+            cover_image_url:
+              payload.cover_image_url ||
+              'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
             created_at: new Date().toISOString(),
           };
-          setEvents((prev) => [newEv, ...prev]);
+          updatedList = [newEv, ...events];
+        }
+        setEvents(updatedList);
+        try {
+          sessionStorage.setItem('sign_dev_events', JSON.stringify(updatedList));
+        } catch {
+          // ignore
         }
         setIsModalOpen(false);
         return;
       }
 
       if (editingEvent) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('events')
           .update(payload)
-          .eq('id', editingEvent.id);
+          .eq('id', editingEvent.id)
+          .select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('Database permission denied: Supabase RLS blocked the update. Check that your account has event_manager or super_admin permissions.');
+        }
       } else {
-        const { error } = await supabase.from('events').insert({
+        const { data, error } = await supabase.from('events').insert({
           ...payload,
           created_by: user?.id,
-        });
+        }).select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('Database permission denied: Supabase RLS blocked the insert. Check that your account has event_manager or super_admin permissions.');
+        }
       }
 
       setIsModalOpen(false);
@@ -237,19 +262,27 @@ export const AdminEventsPage: React.FC = () => {
   };
 
   const togglePublish = async (ev: EventItem) => {
-    if (!isSupabaseConfigured) {
-      setEvents((prev) =>
-        prev.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e))
-      );
+    if (isDevSession) {
+      const updatedList = events.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e));
+      setEvents(updatedList);
+      try {
+        sessionStorage.setItem('sign_dev_events', JSON.stringify(updatedList));
+      } catch {
+        // ignore
+      }
       return;
     }
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('events')
         .update({ is_published: !ev.is_published, updated_at: new Date().toISOString() })
-        .eq('id', ev.id);
+        .eq('id', ev.id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Permission denied: Supabase RLS blocked the update.');
+      }
       setEvents(events.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e)));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error updating publication status';
@@ -262,14 +295,23 @@ export const AdminEventsPage: React.FC = () => {
       return;
     }
 
-    if (!isSupabaseConfigured) {
-      setEvents((prev) => prev.filter((e) => e.id !== id));
+    if (isDevSession) {
+      const updatedList = events.filter((e) => e.id !== id);
+      setEvents(updatedList);
+      try {
+        sessionStorage.setItem('sign_dev_events', JSON.stringify(updatedList));
+      } catch {
+        // ignore
+      }
       return;
     }
 
     try {
-      const { error } = await supabase.from('events').delete().eq('id', id);
+      const { data, error } = await supabase.from('events').delete().eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Permission denied: Supabase RLS blocked the deletion.');
+      }
       setEvents(events.filter((e) => e.id !== id));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error deleting event';
@@ -309,6 +351,15 @@ export const AdminEventsPage: React.FC = () => {
           Create New Event
         </button>
       </div>
+
+      {isDevSession && (
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>
+            <strong>Dev Preview Mode Active:</strong> Events update immediately on your screen and public preview during this session. To permanently persist updates to the Supabase cloud database, sign in with a registered event manager or super admin account.
+          </span>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">

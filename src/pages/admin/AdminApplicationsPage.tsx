@@ -104,7 +104,7 @@ export const AdminApplicationsPage: React.FC = () => {
     try {
       const timestamp = new Date().toISOString();
 
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured || user.id.startsWith('dev-')) {
         setApplications(
           applications.map((a) =>
             a.id === selectedApp.id

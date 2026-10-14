@@ -22,6 +22,21 @@ export const EventsSection: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchEvents = async () => {
+      try {
+        const devCached = sessionStorage.getItem('sign_dev_events');
+        if (devCached) {
+          const parsed = JSON.parse(devCached) as EventItem[];
+          const published = parsed.filter((e) => e.is_published);
+          if (published.length > 0 && isMounted) {
+            setEvents(published);
+            setIsLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
       if (!isSupabaseConfigured) {
         setIsLoading(false);
         return;

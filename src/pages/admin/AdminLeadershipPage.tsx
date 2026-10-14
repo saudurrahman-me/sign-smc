@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useAuth } from '../../context/AuthContext';
 import type { LeadershipProfile } from '../../types/database.types';
 import { INITIAL_LEADERSHIP_PLACEHOLDERS } from '../../data/fallback-content';
 import {
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 
 export const AdminLeadershipPage: React.FC = () => {
+  const { user } = useAuth();
   const [profiles, setProfiles] = useState<LeadershipProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,8 +43,23 @@ export const AdminLeadershipPage: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  const isDevSession = !isSupabaseConfigured || Boolean(user?.id?.startsWith('dev-'));
+
   const fetchProfiles = async () => {
     setIsLoading(true);
+    if (isDevSession) {
+      try {
+        const stored = sessionStorage.getItem('sign_dev_leadership_profiles');
+        if (stored) {
+          setProfiles(JSON.parse(stored));
+          setIsLoading(false);
+          return;
+        }
+      } catch {
+        // ignore
+      }
+    }
+
     if (!isSupabaseConfigured) {
       setProfiles(INITIAL_LEADERSHIP_PLACEHOLDERS);
       setIsLoading(false);
@@ -68,7 +85,7 @@ export const AdminLeadershipPage: React.FC = () => {
 
   useEffect(() => {
     fetchProfiles();
-  }, []);
+  }, [user]);
 
   const openCreateModal = () => {
     setEditingProfile(null);
@@ -133,37 +150,55 @@ export const AdminLeadershipPage: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
 
-      if (!isSupabaseConfigured) {
+      if (isDevSession) {
+        let updatedList: LeadershipProfile[];
         if (editingProfile) {
-          setProfiles((prev) =>
-            prev.map((item) =>
-              item.id === editingProfile.id
-                ? { ...item, ...payload, photo_url: payload.photo_url || item.photo_url }
-                : item
-            )
+          updatedList = profiles.map((item) =>
+            item.id === editingProfile.id
+              ? { ...item, ...payload, photo_url: payload.photo_url || item.photo_url }
+              : item
           );
         } else {
           const newEntry: LeadershipProfile = {
             id: `dev-lead-${Date.now()}`,
             ...payload,
-            photo_url: payload.photo_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+            photo_url:
+              payload.photo_url ||
+              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
             created_at: new Date().toISOString(),
           };
-          setProfiles((prev) => [...prev, newEntry]);
+          updatedList = [...profiles, newEntry];
+        }
+        setProfiles(updatedList);
+        try {
+          sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
+        } catch {
+          // ignore
         }
         setIsModalOpen(false);
         return;
       }
 
       if (editingProfile) {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('leadership_profiles')
           .update(payload)
-          .eq('id', editingProfile.id);
+          .eq('id', editingProfile.id)
+          .select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'Database permission denied: Supabase RLS blocked the update. Check that your user account has website_admin or super_admin permissions.'
+          );
+        }
       } else {
-        const { error } = await supabase.from('leadership_profiles').insert(payload);
+        const { data, error } = await supabase.from('leadership_profiles').insert(payload).select();
         if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error(
+            'Database permission denied: Supabase RLS blocked the insertion. Check that your user account has website_admin or super_admin permissions.'
+          );
+        }
       }
 
       setIsModalOpen(false);
@@ -177,19 +212,29 @@ export const AdminLeadershipPage: React.FC = () => {
   };
 
   const togglePublish = async (p: LeadershipProfile) => {
-    if (!isSupabaseConfigured) {
-      setProfiles((prev) =>
-        prev.map((item) => (item.id === p.id ? { ...item, is_published: !p.is_published } : item))
+    if (isDevSession) {
+      const updatedList = profiles.map((item) =>
+        item.id === p.id ? { ...item, is_published: !p.is_published } : item
       );
+      setProfiles(updatedList);
+      try {
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
+      } catch {
+        // ignore
+      }
       return;
     }
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('leadership_profiles')
         .update({ is_published: !p.is_published, updated_at: new Date().toISOString() })
-        .eq('id', p.id);
+        .eq('id', p.id)
+        .select();
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Permission denied: Supabase RLS blocked the update.');
+      }
       setProfiles(
         profiles.map((item) => (item.id === p.id ? { ...item, is_published: !p.is_published } : item))
       );
@@ -201,13 +246,22 @@ export const AdminLeadershipPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this profile?')) return;
-    if (!isSupabaseConfigured) {
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
+    if (isDevSession) {
+      const updatedList = profiles.filter((p) => p.id !== id);
+      setProfiles(updatedList);
+      try {
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
+      } catch {
+        // ignore
+      }
       return;
     }
     try {
-      const { error } = await supabase.from('leadership_profiles').delete().eq('id', id);
+      const { data, error } = await supabase.from('leadership_profiles').delete().eq('id', id).select();
       if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Permission denied: Supabase RLS blocked the deletion.');
+      }
       setProfiles(profiles.filter((p) => p.id !== id));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error deleting profile';
@@ -245,6 +299,15 @@ export const AdminLeadershipPage: React.FC = () => {
           Add Profile / Candidate
         </button>
       </div>
+
+      {isDevSession && (
+        <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
+          <AlertCircle className="w-4 h-4 flex-shrink-0 text-amber-400" />
+          <span>
+            <strong>Dev Preview Mode Active:</strong> Biographies and profile changes update immediately on your screen and in public preview during this session. To permanently persist updates to the Supabase cloud database, sign in with a registered admin account.
+          </span>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="flex items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">

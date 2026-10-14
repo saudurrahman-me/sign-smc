@@ -108,7 +108,7 @@ export const AdminUsersPage: React.FC = () => {
 
     setIsUpdating(targetUser.id);
     try {
-      if (!isSupabaseConfigured) {
+      if (!isSupabaseConfigured || currentUser?.id?.startsWith('dev-')) {
         setProfiles(
           profiles.map((p) => (p.id === targetUser.id ? { ...p, role: newRole } : p))
         );
