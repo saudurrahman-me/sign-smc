@@ -97,8 +97,8 @@ export const LoginPage: React.FC = () => {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 sm:px-0">
         <div className="bg-[#052919]/90 backdrop-blur-xl py-8 px-6 sm:px-10 shadow-2xl rounded-2xl border border-emerald-900/60">
-          {/* Quick Dev Demo Access when Supabase is unconfigured */}
-          {!isConfigured && (
+          {/* Quick Dev Demo Access when in development or Supabase is unconfigured */}
+          {(!isConfigured || import.meta.env.DEV) && (
             <div className="mb-6 p-4 rounded-xl bg-gradient-to-br from-emerald-950/90 via-slate-900 to-[#032014] border border-emerald-500/40 shadow-xl">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
@@ -106,15 +106,15 @@ export const LoginPage: React.FC = () => {
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                   <h3 className="text-xs font-bold text-white tracking-wide">
-                    Instant Admin Demo Access
+                    Instant Admin Access
                   </h3>
                 </div>
                 <span className="text-[10px] font-mono font-semibold uppercase bg-emerald-900/60 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                  Preview Mode
+                  Dev Mode
                 </span>
               </div>
               <p className="text-xs text-slate-300 mb-3 leading-relaxed">
-                Supabase database setup is currently pending. Click below to sign in immediately and preview the admin control center:
+                Click below to immediately enter the admin control center:
               </p>
 
               <div className="space-y-2">
