@@ -413,7 +413,7 @@ export const MembershipSection: React.FC = () => {
               <div className="mt-8 pt-6 border-t border-emerald-950/80 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-emerald-200/70">
                 <span>• Open to MBBS & BDS Students</span>
                 <span>• Official Inquiries: signsmc.official@gmail.com</span>
-                <span>• KMU Affiliated Chapter</span>
+                <span>• Saidu Medical College, Swat</span>
               </div>
             </div>
           </div>
@@ -480,7 +480,7 @@ export const MembershipSection: React.FC = () => {
               <div className="mt-8 pt-6 border-t border-slate-800 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400">
                 <span>• Saidu Medical College (SMC)</span>
                 <span>• Official Secretariat: signsmc.official@gmail.com</span>
-                <span>• KMU Affiliated Chapter</span>
+                <span>• Swat, Khyber Pakhtunkhwa</span>
               </div>
             </div>
           </div>

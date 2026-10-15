@@ -1,7 +1,6 @@
 -- ==============================================================================
 -- SIGN Chapter SMC Swat - Supabase Initial Schema & Security Migration
 -- Student Interest Group in Neurology (SIGN), Saidu Medical College (SMC), Swat
--- Affiliated with Khyber Medical University (KMU)
 -- ==============================================================================
 
 -- 1. EXTENSIONS
