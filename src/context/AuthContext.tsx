@@ -40,8 +40,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('[SIGN Auth] Failed to load profile:', error.message);
+      if (error || !data) {
+        // If profile row doesn't exist yet (e.g. freshly authenticated via Google OAuth),
+        // synthesize an applicant profile using Google metadata and attempt upsert
+        const { data: userData } = await supabase.auth.getUser();
+        const authUser = userData?.user;
+        const displayName =
+          authUser?.user_metadata?.full_name ||
+          authUser?.user_metadata?.name ||
+          authUser?.email?.split('@')[0] ||
+          'Member';
+
+        const synthesized: Profile = {
+          id: userId,
+          email: authUser?.email || '',
+          full_name: displayName,
+          role: 'applicant',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        try {
+          await supabase.from('profiles').upsert({
+            id: userId,
+            email: authUser?.email,
+            full_name: displayName,
+            role: 'applicant',
+          });
+        } catch {
+          // ignore if RLS restricts direct client upsert
+        }
+
+        setProfile(synthesized);
         return;
       }
       setProfile(data as Profile);
