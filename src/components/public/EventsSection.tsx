@@ -4,10 +4,12 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useOptionalAuth } from '../../context/AuthContext';
 import type { EventItem, EventCategory, EventRegistration } from '../../types/database.types';
 import { EventRegistrationModal } from './EventRegistrationModal';
+import { LoginRequiredModal } from './LoginRequiredModal';
 
 export const EventsSection: React.FC = () => {
   const auth = useOptionalAuth();
   const user = auth?.user || null;
+  const isInsideAuth = auth !== null;
 
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -17,6 +19,7 @@ export const EventsSection: React.FC = () => {
   const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null);
   const [userRegistrations, setUserRegistrations] = useState<Record<string, EventRegistration>>({});
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const categories: Array<'All' | EventCategory> = [
     'All',
@@ -76,16 +79,34 @@ export const EventsSection: React.FC = () => {
   }, []);
 
   const loadUserRegistrations = useCallback(async () => {
-    const regMap: Record<string, EventRegistration> = {};
+    // If inside AuthProvider and visitor is logged out, clear all registrations immediately!
+    if (isInsideAuth && !user) {
+      setUserRegistrations({});
+      return;
+    }
 
-    // 1. Read from local storage (for current visitor/device)
+    const regMap: Record<string, EventRegistration> = {};
+    const currentUserId = user?.id;
+    const currentUserEmail = user?.email?.trim().toLowerCase();
+
+    // 1. Read from local storage ONLY for this specific authenticated user
     try {
       const stored = localStorage.getItem('sign_event_registrations');
       if (stored) {
         const parsed: EventRegistration[] = JSON.parse(stored);
         parsed.forEach((r) => {
-          if (r.event_id) {
-            regMap[r.event_id] = r;
+          if (isInsideAuth) {
+            const isOwn =
+              (currentUserId && r.user_id === currentUserId) ||
+              (currentUserEmail && r.email?.trim().toLowerCase() === currentUserEmail);
+            if (r.event_id && isOwn) {
+              regMap[r.event_id] = r;
+            }
+          } else {
+            // Fallback for isolated unit tests without an AuthProvider
+            if (r.event_id) {
+              regMap[r.event_id] = r;
+            }
           }
         });
       }
@@ -94,16 +115,15 @@ export const EventsSection: React.FC = () => {
     }
 
     // 2. Read from Supabase if authenticated user is present
-    if (isSupabaseConfigured && (user?.id || user?.email)) {
+    if (isSupabaseConfigured && (currentUserId || currentUserEmail)) {
       try {
-        const email = user.email?.trim().toLowerCase();
         let query = supabase.from('event_registrations').select('*');
-        if (user.id && email) {
-          query = query.or(`user_id.eq.${user.id},email.eq.${email}`);
-        } else if (user.id) {
-          query = query.eq('user_id', user.id);
-        } else if (email) {
-          query = query.eq('email', email);
+        if (currentUserId && currentUserEmail) {
+          query = query.or(`user_id.eq.${currentUserId},email.eq.${currentUserEmail}`);
+        } else if (currentUserId) {
+          query = query.eq('user_id', currentUserId);
+        } else if (currentUserEmail) {
+          query = query.eq('email', currentUserEmail);
         }
 
         const { data, error } = await query;
@@ -120,7 +140,7 @@ export const EventsSection: React.FC = () => {
     }
 
     setUserRegistrations(regMap);
-  }, [user?.id, user?.email]);
+  }, [user, isInsideAuth]);
 
   useEffect(() => {
     loadUserRegistrations();
@@ -302,6 +322,10 @@ export const EventsSection: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => {
+                          if (isInsideAuth && !user) {
+                            setIsLoginModalOpen(true);
+                            return;
+                          }
                           setSelectedEventForReg(ev);
                           setSelectedRegistration(null);
                           setIsRegModalOpen(true);
@@ -371,6 +395,22 @@ export const EventsSection: React.FC = () => {
           }}
         />
       )}
+
+      {/* Login Required Prompt Modal */}
+      <LoginRequiredModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+        title="Sign In to Register for Events"
+        subtitle="Attendee Verification Required"
+        description="To register for official SIGN SMC academic events, receive your personalized attendee pass, and submit fee verification, please sign in with your student account."
+        benefits={[
+          'Your attendee pass and registration code are securely saved to your account.',
+          'View your registration details and event guidelines anytime.',
+          'Official participation certificates are issued directly to your profile upon attendance.',
+        ]}
+        redirectUrl="/login?redirect=events"
+        registerUrl="/register?redirect=events"
+      />
     </section>
   );
 };

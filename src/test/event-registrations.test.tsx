@@ -1,9 +1,11 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { EventRegistrationModal } from '../components/public/EventRegistrationModal';
 import { EventsSection } from '../components/public/EventsSection';
-import type { EventItem } from '../types/database.types';
+import { AuthContext, type AuthContextType } from '../context/AuthContext';
+import type { EventItem, EventRegistration } from '../types/database.types';
 
 const mockEvent: EventItem = {
   id: 'test-event-uuid-1234',
@@ -373,5 +375,248 @@ describe('Event Registration System', () => {
       expect(screen.getByText('0333-7778899')).toBeInTheDocument();
       expect(screen.getByText(/Excited for stroke localization seminar/i)).toBeInTheDocument();
     });
+  });
+
+  it('logged-out visitor does not see previous user registration from localStorage and Register triggers login prompt', async () => {
+    // Simulate Account A having registered previously
+    const accountAReg: EventRegistration = {
+      id: 'reg-account-a',
+      event_id: mockEvent.id,
+      user_id: 'user-uuid-account-a',
+      full_name: 'Account A Student',
+      email: 'account-a@smc.edu.pk',
+      phone: '0333-1112233',
+      college_name: 'Saidu Medical College, Swat',
+      mbbs_year: 'MBBS - 4th Year',
+      student_id: 'SMC-101',
+      questions_or_notes: null,
+      attendance_status: 'registered',
+      registration_code: 'SMC-REG-ACCOUNT-A',
+      created_at: new Date().toISOString(),
+    };
+    localStorage.setItem('sign_event_registrations', JSON.stringify([accountAReg]));
+    sessionStorage.setItem('sign_dev_events', JSON.stringify([mockEvent]));
+
+    // Render with logged-out auth context
+    const loggedOutAuth: AuthContextType = {
+      user: null,
+      profile: null,
+      session: null,
+      role: null,
+      isLoading: false,
+      isSuperAdmin: false,
+      isWebsiteAdmin: false,
+      isEventManager: false,
+      isMember: false,
+      isConfigured: false,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      refreshProfile: vi.fn(),
+      devSignIn: vi.fn(),
+    };
+
+    render(
+      <MemoryRouter>
+        <AuthContext.Provider value={loggedOutAuth}>
+          <EventsSection />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+    });
+
+    // CRITICAL: Logged out user must NOT see "Registered • View Details"
+    expect(screen.queryByRole('button', { name: /Registered.*View Details/i })).not.toBeInTheDocument();
+
+    // Must show Register button
+    const registerBtn = screen.getByRole('button', { name: /^Register$/i });
+    expect(registerBtn).toBeInTheDocument();
+
+    // Clicking Register while logged out opens the LoginRequiredModal
+    fireEvent.click(registerBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Sign In to Register for Events/i)).toBeInTheDocument();
+      expect(screen.getByText(/Attendee Verification Required/i)).toBeInTheDocument();
+    });
+  });
+
+  it('account isolation: Account B does not see Account A registration, but Account A sees their own', async () => {
+    const accountAReg: EventRegistration = {
+      id: 'reg-account-a',
+      event_id: mockEvent.id,
+      user_id: 'user-uuid-account-a',
+      full_name: 'Account A Student',
+      email: 'account-a@smc.edu.pk',
+      phone: '0333-1112233',
+      college_name: 'Saidu Medical College, Swat',
+      mbbs_year: 'MBBS - 4th Year',
+      student_id: 'SMC-101',
+      questions_or_notes: null,
+      attendance_status: 'registered',
+      registration_code: 'SMC-REG-ACCOUNT-A',
+      created_at: new Date().toISOString(),
+    };
+    localStorage.setItem('sign_event_registrations', JSON.stringify([accountAReg]));
+    sessionStorage.setItem('sign_dev_events', JSON.stringify([mockEvent]));
+
+    // 1. Account B logs in
+    const accountBAuth: AuthContextType = {
+      user: { id: 'user-uuid-account-b', email: 'account-b@smc.edu.pk' } as any,
+      profile: {
+        id: 'user-uuid-account-b',
+        email: 'account-b@smc.edu.pk',
+        full_name: 'Account B Student',
+        role: 'applicant',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      session: null,
+      role: 'applicant',
+      isLoading: false,
+      isSuperAdmin: false,
+      isWebsiteAdmin: false,
+      isEventManager: false,
+      isMember: false,
+      isConfigured: false,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      refreshProfile: vi.fn(),
+      devSignIn: vi.fn(),
+    };
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <AuthContext.Provider value={accountBAuth}>
+          <EventsSection />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+    });
+
+    // Account B must NOT see Account A's registration
+    expect(screen.queryByRole('button', { name: /Registered.*View Details/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Register$/i })).toBeInTheDocument();
+
+    unmount();
+
+    // 2. Account A logs in
+    const accountAAuth: AuthContextType = {
+      user: { id: 'user-uuid-account-a', email: 'account-a@smc.edu.pk' } as any,
+      profile: {
+        id: 'user-uuid-account-a',
+        email: 'account-a@smc.edu.pk',
+        full_name: 'Account A Student',
+        role: 'applicant',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      session: null,
+      role: 'applicant',
+      isLoading: false,
+      isSuperAdmin: false,
+      isWebsiteAdmin: false,
+      isEventManager: false,
+      isMember: false,
+      isConfigured: false,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      refreshProfile: vi.fn(),
+      devSignIn: vi.fn(),
+    };
+
+    render(
+      <MemoryRouter>
+        <AuthContext.Provider value={accountAAuth}>
+          <EventsSection />
+        </AuthContext.Provider>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+    });
+
+    // Account A DOES see their registered pass
+    expect(screen.getByRole('button', { name: /Registered.*View Details/i })).toBeInTheDocument();
+  });
+
+  it('EventRegistrationModal prevents showing confirmed attendee pass when user does not own the registration', async () => {
+    const foreignReg: EventRegistration = {
+      id: 'reg-foreign',
+      event_id: mockEvent.id,
+      user_id: 'user-foreign',
+      full_name: 'Foreign Student',
+      email: 'foreign@smc.edu.pk',
+      phone: '0333-9998877',
+      college_name: 'Saidu Medical College, Swat',
+      mbbs_year: 'MBBS - 3rd Year',
+      student_id: 'SMC-301',
+      questions_or_notes: null,
+      attendance_status: 'registered',
+      registration_code: 'SMC-REG-FOREIGN',
+      created_at: new Date().toISOString(),
+    };
+
+    // Active user is User C
+    const userCAuth: AuthContextType = {
+      user: { id: 'user-c', email: 'user-c@smc.edu.pk' } as any,
+      profile: {
+        id: 'user-c',
+        email: 'user-c@smc.edu.pk',
+        full_name: 'User C',
+        role: 'applicant',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      session: null,
+      role: 'applicant',
+      isLoading: false,
+      isSuperAdmin: false,
+      isWebsiteAdmin: false,
+      isEventManager: false,
+      isMember: false,
+      isConfigured: false,
+      signIn: vi.fn(),
+      signUp: vi.fn(),
+      signInWithGoogle: vi.fn(),
+      signOut: vi.fn(),
+      resetPassword: vi.fn(),
+      refreshProfile: vi.fn(),
+      devSignIn: vi.fn(),
+    };
+
+    render(
+      <AuthContext.Provider value={userCAuth}>
+        <EventRegistrationModal
+          isOpen={true}
+          onClose={() => {}}
+          event={mockEvent}
+          existingRegistration={foreignReg}
+        />
+      </AuthContext.Provider>
+    );
+
+    // Should NOT show confirmed pass of foreign student
+    expect(screen.queryByText(/Your Event Registration/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('SMC-REG-FOREIGN')).not.toBeInTheDocument();
+
+    // Instead, it should show the registration form ready for User C
+    expect(screen.getByRole('button', { name: /Confirm Registration/i })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Dr\. Muhammad Ahmad/i)).toBeInTheDocument();
   });
 });

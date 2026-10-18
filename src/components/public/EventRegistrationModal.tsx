@@ -74,20 +74,30 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const [confirmedReg, setConfirmedReg] = useState<EventRegistration | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // Sync profile details when available
-  useEffect(() => {
-    if (profile?.full_name && !fullName) {
-      setFullName(profile.full_name);
-    }
-    if (user?.email && !email) {
-      setEmail(user.email);
-    }
-  }, [profile, user]);
-
   // Reset or initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setConfirmedReg(existingRegistration || null);
+      // Validate that existing registration strictly matches the active user
+      if (auth && existingRegistration) {
+        if (user) {
+          const matchesUser =
+            (existingRegistration.user_id && existingRegistration.user_id === user.id) ||
+            (user.email && existingRegistration.email?.toLowerCase() === user.email.toLowerCase());
+          setConfirmedReg(matchesUser ? existingRegistration : null);
+        } else {
+          // If logged out inside app, do not display someone else's attendee pass
+          setConfirmedReg(null);
+        }
+      } else {
+        // Fallback for isolated unit tests without an AuthProvider
+        setConfirmedReg(existingRegistration || null);
+      }
+
+      setFullName(profile?.full_name || '');
+      setEmail(user?.email || profile?.email || '');
+      setPhone('');
+      setStudentId('');
+      setQuestions('');
       setErrorMessage(null);
       setCopiedCode(false);
       setCopiedBank(false);
@@ -101,7 +111,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
       setCompressionStats(null);
       setIsViewingReceiptLightbox(false);
     }
-  }, [isOpen, event?.id, existingRegistration]);
+  }, [isOpen, event?.id, existingRegistration, user, profile]);
 
   if (!isOpen || !event) return null;
 

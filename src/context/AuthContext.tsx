@@ -3,7 +3,7 @@ import type { User, Session, AuthError } from '@supabase/supabase-js';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import type { Profile, UserRole } from '../types/database.types';
 
-interface AuthContextType {
+export interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   session: Session | null;
@@ -23,7 +23,7 @@ interface AuthContextType {
   devSignIn: (role?: UserRole) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
