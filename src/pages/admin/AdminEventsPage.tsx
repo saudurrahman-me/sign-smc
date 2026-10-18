@@ -444,7 +444,7 @@ export const AdminEventsPage: React.FC = () => {
       'Fee Type',
       'Fee Amount (PKR)',
       'Amount Paid (PKR)',
-      'Ambassador Code',
+      'Ambassador / Member Code',
       'Discount Applied (PKR)',
       'Payment Status',
       'Transaction ID',
@@ -1432,7 +1432,7 @@ export const AdminEventsPage: React.FC = () => {
                       <div>
                         <label className="block text-slate-300 font-semibold mb-1 text-[11px] flex items-center gap-1">
                           <Tag className="w-3 h-3 text-teal-400" />
-                          <span>Ambassador Discount Code(s)</span>
+                          <span>Ambassador / Member Discount Code(s)</span>
                         </label>
                         <input
                           type="text"
@@ -1442,13 +1442,13 @@ export const AdminEventsPage: React.FC = () => {
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white uppercase tracking-wider font-mono focus:border-teal-500"
                         />
                         <span className="text-[10px] text-slate-500 mt-1 block">
-                          Attendees with this code receive ambassador discount
+                          Attendees with this code receive ambassador or member discount
                         </span>
                       </div>
 
                       <div>
                         <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                          Ambassador Discount Percentage (%)
+                          Ambassador / Member Discount Percentage (%)
                         </label>
                         <input
                           type="number"
@@ -1460,7 +1460,7 @@ export const AdminEventsPage: React.FC = () => {
                           className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white font-mono focus:border-teal-500"
                         />
                         <span className="text-[10px] text-slate-500 mt-1 block">
-                          e.g. 20% discount (Set 100 for free ambassador registration)
+                          e.g. 20% discount (Set 100 for free ambassador / member registration)
                         </span>
                       </div>
                     </div>
@@ -1679,7 +1679,7 @@ export const AdminEventsPage: React.FC = () => {
                     type="text"
                     value={attendeeSearchQuery}
                     onChange={(e) => setAttendeeSearchQuery(e.target.value)}
-                    placeholder="Search by name, email, code, ambassador..."
+                    placeholder="Search by name, email, code, ambassador / member..."
                     className="w-full pl-10 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500"
                   />
                 </div>
@@ -1814,7 +1814,7 @@ export const AdminEventsPage: React.FC = () => {
                                     {att.ambassador_code && (
                                       <span
                                         className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-700/50 px-1.5 py-0.5 rounded"
-                                        title={`Ambassador Code: ${att.ambassador_code} (Discount: PKR ${att.discount_applied ?? 0})`}
+                                        title={`Ambassador / Member Code: ${att.ambassador_code} (Discount: PKR ${att.discount_applied ?? 0})`}
                                       >
                                         {att.ambassador_code}
                                       </span>
@@ -1985,7 +1985,7 @@ export const AdminEventsPage: React.FC = () => {
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px]">Ambassador Code:</span>
+                <span className="text-slate-400 block text-[10px]">Ambassador / Member Code:</span>
                 <span className="font-mono text-emerald-300 font-semibold">
                   {selectedReceiptReg.ambassador_code || 'None'}
                 </span>

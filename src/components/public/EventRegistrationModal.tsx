@@ -27,6 +27,8 @@ import {
   Eye,
   Building2,
   FileCheck,
+  MessageCircle,
+  Mail,
 } from 'lucide-react';
 
 interface EventRegistrationModalProps {
@@ -162,7 +164,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
     const raw = ambassadorInput.trim();
     if (!raw) {
-      setAmbassadorMessage({ type: 'error', text: 'Please enter an ambassador discount code.' });
+      setAmbassadorMessage({ type: 'error', text: 'Please enter an ambassador or member code.' });
       return;
     }
 
@@ -189,7 +191,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
     } else {
       setAmbassadorMessage({
         type: 'error',
-        text: 'Invalid ambassador code. Please verify with your campus ambassador.',
+        text: 'Invalid ambassador or member code. Please verify with your campus ambassador or executive team.',
       });
     }
   };
@@ -241,12 +243,20 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
       return;
     }
 
-    // If event is paid and fee is greater than 0, payment proof is mandatory
-    if (isPaidEvent && finalFee > 0 && !paymentFile && !paymentPreview) {
-      setErrorMessage(
-        `Please upload proof of your event fee payment (PKR ${finalFee}) before confirming registration.`
-      );
-      return;
+    // If event is paid and fee is greater than 0, transaction ID and payment proof are mandatory
+    if (isPaidEvent && finalFee > 0) {
+      if (!transactionId.trim()) {
+        setErrorMessage(
+          'Please enter your Transaction ID or Bank Reference Number for payment verification.'
+        );
+        return;
+      }
+      if (!paymentFile && !paymentPreview) {
+        setErrorMessage(
+          `Please upload proof of your event fee payment (PKR ${finalFee}) before confirming registration.`
+        );
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -552,7 +562,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                       <div className="flex items-center justify-between text-emerald-400">
                         <span className="inline-flex items-center gap-1">
                           <Tag className="w-3 h-3" />
-                          Ambassador Code ({confirmedReg.ambassador_code}):
+                          Ambassador / Member Code ({confirmedReg.ambassador_code}):
                         </span>
                         <span>-PKR {confirmedReg.discount_applied || 0}</span>
                       </div>
@@ -652,7 +662,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             </div>
           ) : (
             /* Registration Input Form */
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               {/* Event Quick Overview Pill */}
               <div className="p-3.5 rounded-2xl bg-slate-950 border border-slate-800/80 space-y-2">
                 <div className="flex items-center justify-between">
@@ -831,12 +841,12 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                       </span>
                     </div>
 
-                    {/* Ambassador Code Input */}
+                    {/* Ambassador / Member Code Input */}
                     <div className="space-y-2">
                       <label className="block text-[11px] font-semibold text-slate-300 flex items-center justify-between">
                         <span className="flex items-center gap-1.5">
                           <Tag className="w-3.5 h-3.5 text-teal-400" />
-                          Ambassador Discount Code
+                          Ambassador / Member Code
                         </span>
                         {appliedAmbassadorCode && (
                           <span className="text-[10px] text-emerald-400 font-bold bg-emerald-950/70 border border-emerald-700/50 px-2 py-0.5 rounded">
@@ -871,7 +881,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                               setAmbassadorInput(e.target.value);
                               if (ambassadorMessage) setAmbassadorMessage(null);
                             }}
-                            placeholder="Enter Ambassador Code (e.g. AMBASSADOR)"
+                            placeholder="Enter Ambassador / Member Code (e.g. AMBASSADOR, SMC2026)"
                             className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500 uppercase tracking-wider font-mono"
                           />
                           <button
@@ -904,7 +914,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                         </span>
                         {isFeeWaived && (
                           <span className="block text-[10px] text-emerald-400 font-semibold">
-                            ✓ 100% Fee Waived via Ambassador Code!
+                            ✓ 100% Fee Waived via Ambassador / Member Code!
                           </span>
                         )}
                       </div>
@@ -965,17 +975,53 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                         </p>
                       </div>
 
-                      {/* Transaction ID Input (Optional reference) */}
-                      <div>
-                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
-                          Transaction ID / Ref Number (Optional)
+                      {/* Transaction Support / Issue Instructions */}
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs space-y-2">
+                        <div className="flex items-center gap-2 font-bold text-amber-300">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                          <span>Encountering a Transaction Error or Payment Issue?</span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed">
+                          If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
+                          <a
+                            href="https://wa.me/923179752692"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-emerald-300 hover:text-emerald-200 font-semibold transition-colors bg-emerald-950/70 hover:bg-emerald-900/80 px-2.5 py-1.5 rounded-lg border border-emerald-700/50"
+                          >
+                            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>WhatsApp: 0317-9752692 (Waqar Younas)</span>
+                          </a>
+                          <a
+                            href="mailto:signsmc.official@gmail.com"
+                            className="inline-flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold transition-colors bg-teal-950/70 hover:bg-teal-900/80 px-2.5 py-1.5 rounded-lg border border-teal-700/50"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-teal-400" />
+                            <span>signsmc.official@gmail.com</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Transaction ID Input (Mandatory reference) */}
+                      <div className="space-y-1.5">
+                        <label className="block text-slate-300 font-semibold text-[11px] flex items-center justify-between">
+                          <span className="flex items-center gap-1.5">
+                            <span>Transaction ID / Ref Number</span>
+                            <span className="text-rose-400 font-bold">*</span>
+                          </span>
+                          <span className="text-[10px] text-amber-400 font-medium bg-amber-950/60 border border-amber-800/40 px-2 py-0.5 rounded">
+                            Mandatory for verification
+                          </span>
                         </label>
                         <input
                           type="text"
+                          required
                           value={transactionId}
                           onChange={(e) => setTransactionId(e.target.value)}
-                          placeholder="e.g. TRX-9823487192"
-                          className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 font-mono text-xs focus:border-teal-500"
+                          placeholder="e.g. TRX-9823487192 / Easypaisa TID"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 font-mono text-xs focus:border-teal-500 transition-colors"
                         />
                       </div>
 

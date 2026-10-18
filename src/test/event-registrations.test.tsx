@@ -167,7 +167,7 @@ describe('Event Registration System', () => {
     });
   });
 
-  it('renders fee, bank account details, and ambassador discount input for a paid event', () => {
+  it('renders fee, bank account details, ambassador/member code input, and transaction support instructions for a paid event', () => {
     render(
       <EventRegistrationModal
         isOpen={true}
@@ -181,11 +181,19 @@ describe('Event Registration System', () => {
     expect(screen.getByText(/Easypaisa Payment Details/i)).toBeInTheDocument();
     expect(screen.getByText('Waqar Younas')).toBeInTheDocument();
     expect(screen.getByText('03179752692')).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/Enter Ambassador Code/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Enter Ambassador \/ Member Code/i)).toBeInTheDocument();
     expect(screen.getByText(/Upload Payment Proof Screenshot/i)).toBeInTheDocument();
+
+    // Verify transaction support instructions and mandatory transaction ID
+    expect(
+      screen.getByText(/Encountering a Transaction Error or Payment Issue\?/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/0317-9752692/i)).toBeInTheDocument();
+    expect(screen.getByText(/signsmc\.official@gmail\.com/i)).toBeInTheDocument();
+    expect(screen.getByText(/Mandatory for verification/i)).toBeInTheDocument();
   });
 
-  it('validates and applies ambassador discount code correctly', async () => {
+  it('validates and applies ambassador/member discount code correctly', async () => {
     render(
       <EventRegistrationModal
         isOpen={true}
@@ -194,7 +202,7 @@ describe('Event Registration System', () => {
       />
     );
 
-    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador Code/i);
+    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador \/ Member Code/i);
     const applyBtn = screen.getByRole('button', { name: /Apply/i });
 
     // Try invalid code
@@ -202,7 +210,7 @@ describe('Event Registration System', () => {
     fireEvent.click(applyBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/Invalid ambassador code/i)).toBeInTheDocument();
+      expect(screen.getByText(/Invalid ambassador or member code/i)).toBeInTheDocument();
     });
 
     // Enter valid ambassador code
@@ -218,7 +226,7 @@ describe('Event Registration System', () => {
     expect(screen.getByText('PKR 400')).toBeInTheDocument();
   });
 
-  it('enforces payment receipt upload when registering for a paid event', async () => {
+  it('enforces mandatory transaction ID and payment receipt upload when registering for a paid event', async () => {
     render(
       <EventRegistrationModal
         isOpen={true}
@@ -237,7 +245,18 @@ describe('Event Registration System', () => {
       target: { value: '0333-1234567' },
     });
 
-    // Click submit without uploading receipt
+    // 1. Click submit without transaction ID
+    fireEvent.click(screen.getByRole('button', { name: /Submit Registration & Payment/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Please enter your Transaction ID or Bank Reference Number for payment verification/i)
+      ).toBeInTheDocument();
+    });
+
+    // 2. Fill Transaction ID but without payment proof receipt
+    const trxInput = screen.getByPlaceholderText(/e\.g\. TRX-|Easypaisa TID/i);
+    fireEvent.change(trxInput, { target: { value: 'TRX-12345678' } });
     fireEvent.click(screen.getByRole('button', { name: /Submit Registration & Payment/i }));
 
     await waitFor(() => {
@@ -247,7 +266,7 @@ describe('Event Registration System', () => {
     });
   });
 
-  it('successfully uploads payment receipt and completes paid event registration', async () => {
+  it('successfully uploads payment receipt and completes paid event registration with mandatory transaction ID', async () => {
     const handleSuccess = vi.fn();
 
     render(
@@ -269,14 +288,18 @@ describe('Event Registration System', () => {
       target: { value: '0345-1122334' },
     });
 
-    // Apply ambassador code
-    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador Code/i);
+    // Apply ambassador/member code
+    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador \/ Member Code/i);
     fireEvent.change(ambassadorInput, { target: { value: 'SMC2026' } });
     fireEvent.click(screen.getByRole('button', { name: /Apply/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/20% discount/i)).toBeInTheDocument();
     });
+
+    // Enter mandatory transaction ID
+    const trxInput = screen.getByPlaceholderText(/e\.g\. TRX-|Easypaisa TID/i);
+    fireEvent.change(trxInput, { target: { value: 'EP-9988776655' } });
 
     // Attach fake payment receipt
     const fakeFile = new File(['receipt-image-content'], 'easypaisa_receipt.jpg', {
@@ -300,7 +323,8 @@ describe('Event Registration System', () => {
 
     expect(screen.getByText(/Payment Pending Verification/i)).toBeInTheDocument();
     expect(screen.getByText(/PKR 400/i)).toBeInTheDocument();
-    expect(screen.getByText(/Ambassador Code \(SMC2026\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ambassador \/ Member Code \(SMC2026\)/i)).toBeInTheDocument();
+    expect(screen.getByText('EP-9988776655')).toBeInTheDocument();
 
     const stored = JSON.parse(localStorage.getItem('sign_event_registrations') || '[]');
     expect(stored).toHaveLength(1);
@@ -310,6 +334,7 @@ describe('Event Registration System', () => {
     expect(stored[0].ambassador_code).toBe('SMC2026');
     expect(stored[0].discount_applied).toBe(100);
     expect(stored[0].payment_status).toBe('pending');
+    expect(stored[0].transaction_id).toBe('EP-9988776655');
   });
 
   it('renders Register button and pricing badge for upcoming events on EventsSection', async () => {
