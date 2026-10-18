@@ -175,15 +175,16 @@ export const AdminOverviewPage: React.FC = () => {
               pendingCertificates: certData.filter((c) => c.status === 'pending').length,
             }));
           } else {
-            // Check local storage fallback
+            // Check local storage fallback (ignore mock demo items)
             try {
               const local = localStorage.getItem('sign_user_certificates');
               if (local && isMounted) {
-                const parsed = JSON.parse(local);
+                const parsed: any[] = JSON.parse(local);
+                const realOnly = parsed.filter((c) => !c.id?.startsWith('demo-'));
                 setStats((prev) => ({
                   ...prev,
-                  certificatesCount: parsed.length,
-                  pendingCertificates: parsed.filter((c: any) => c.status === 'pending').length,
+                  certificatesCount: realOnly.length,
+                  pendingCertificates: realOnly.filter((c: any) => c.status === 'pending').length,
                 }));
               }
             } catch {

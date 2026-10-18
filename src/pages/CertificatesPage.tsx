@@ -146,30 +146,9 @@ export const CertificatesPage: React.FC = () => {
     };
   }, []);
 
-  // Fetch student certificates
+  // Fetch student certificates strictly for the logged-in user
   const fetchMyCertificates = async () => {
     setIsLoading(true);
-
-    // Retrieve locally submitted certificates from cache
-    let localCerts: EventCertificate[] = [];
-    try {
-      const stored = localStorage.getItem('sign_user_certificates');
-      if (stored) {
-        localCerts = JSON.parse(stored);
-      }
-    } catch {
-      // ignore
-    }
-
-    if (!isSupabaseConfigured) {
-      const combined = [
-        ...localCerts,
-        ...DEMO_CERTIFICATES.filter((d) => !localCerts.some((l) => l.id === d.id)),
-      ];
-      setCertificates(combined);
-      setIsLoading(false);
-      return;
-    }
 
     if (!user) {
       setCertificates([]);
@@ -177,26 +156,82 @@ export const CertificatesPage: React.FC = () => {
       return;
     }
 
+    // 1. Retrieve locally submitted certificates strictly for this user account
+    let userLocalCerts: EventCertificate[] = [];
     try {
-      const { data, error } = await supabase
-        .from('event_certificates')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.warn('[SIGN Certificates] Fetch error:', error.message);
-        setCertificates(localCerts.length > 0 ? localCerts : DEMO_CERTIFICATES);
-      } else if (data) {
-        const merged = [
-          ...localCerts.filter((l) => !data.some((d) => d.id === l.id)),
-          ...(data as EventCertificate[]),
-        ];
-        setCertificates(merged);
+      const stored = localStorage.getItem('sign_user_certificates');
+      if (stored) {
+        const parsed: EventCertificate[] = JSON.parse(stored);
+        userLocalCerts = parsed.filter((c) => {
+          // Never include mock demo certificates
+          if (c.id?.startsWith('demo-')) return false;
+          // Must match current authenticated user ID or email
+          const matchesUid = Boolean(c.user_id && c.user_id === user.id);
+          const matchesEmail = Boolean(
+            user.email &&
+              c.student_email &&
+              c.student_email.trim().toLowerCase() === user.email.trim().toLowerCase()
+          );
+          return matchesUid || matchesEmail;
+        });
       }
+    } catch {
+      // ignore
+    }
+
+    if (!isSupabaseConfigured) {
+      // Offline / local preview: strictly show this user's records
+      setCertificates(userLocalCerts);
+      setIsLoading(false);
+      return;
+    }
+
+    // 2. Query Supabase for this authenticated user's records
+    try {
+      let remoteCerts: EventCertificate[] = [];
+
+      if (user.email) {
+        const { data, error } = await supabase
+          .from('event_certificates')
+          .select('*')
+          .or(`user_id.eq.${user.id},student_email.ilike.${user.email.trim()}`)
+          .order('created_at', { ascending: false });
+
+        if (!error && data) {
+          remoteCerts = data as EventCertificate[];
+        } else {
+          // Fallback to user_id filter
+          const { data: idData } = await supabase
+            .from('event_certificates')
+            .select('*')
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
+          if (idData) {
+            remoteCerts = idData as EventCertificate[];
+          }
+        }
+      } else {
+        const { data: idData } = await supabase
+          .from('event_certificates')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (idData) {
+          remoteCerts = idData as EventCertificate[];
+        }
+      }
+
+      // Merge remote and local records for this user (remote records take priority)
+      const merged = [
+        ...remoteCerts,
+        ...userLocalCerts.filter((l) => !remoteCerts.some((r) => r.id === l.id)),
+      ];
+
+      setCertificates(merged);
     } catch (err) {
-      console.warn('[SIGN Certificates] Unexpected error:', err);
-      setCertificates(localCerts.length > 0 ? localCerts : DEMO_CERTIFICATES);
+      console.warn('[SIGN Certificates] User certificates query notice:', err);
+      // Strictly show only this user's local requests, never mock demo certificates
+      setCertificates(userLocalCerts);
     } finally {
       setIsLoading(false);
     }

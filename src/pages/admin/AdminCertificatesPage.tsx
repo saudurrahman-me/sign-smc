@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { DEMO_CERTIFICATES } from '../../data/fallback-certificates';
 import {
   generateCertificateCode,
   sendCertificateEmailNotification,
@@ -96,23 +95,20 @@ export const AdminCertificatesPage: React.FC = () => {
   const fetchCertificates = async () => {
     setIsLoading(true);
 
-    // Check local storage for session edits
+    // Check local storage for session edits (ignore mock demo items)
     let localCerts: EventCertificate[] = [];
     try {
       const stored = localStorage.getItem('sign_user_certificates');
       if (stored) {
-        localCerts = JSON.parse(stored);
+        const parsed: EventCertificate[] = JSON.parse(stored);
+        localCerts = parsed.filter((c) => !c.id?.startsWith('demo-'));
       }
     } catch {
       // ignore
     }
 
     if (!isSupabaseConfigured) {
-      const combined = [
-        ...localCerts,
-        ...DEMO_CERTIFICATES.filter((d) => !localCerts.some((l) => l.id === d.id)),
-      ];
-      setCertificates(combined);
+      setCertificates(localCerts);
       setIsLoading(false);
       return;
     }
@@ -125,17 +121,19 @@ export const AdminCertificatesPage: React.FC = () => {
 
       if (error) {
         console.warn('[SIGN Admin Certificates] Fetch error:', error.message);
-        setCertificates(localCerts.length > 0 ? localCerts : DEMO_CERTIFICATES);
+        setCertificates(localCerts);
       } else if (data) {
         const merged = [
           ...localCerts.filter((l) => !data.some((d) => d.id === l.id)),
           ...(data as EventCertificate[]),
         ];
         setCertificates(merged);
+      } else {
+        setCertificates(localCerts);
       }
     } catch (err) {
       console.warn('[SIGN Admin Certificates] Unexpected error:', err);
-      setCertificates(localCerts.length > 0 ? localCerts : DEMO_CERTIFICATES);
+      setCertificates(localCerts);
     } finally {
       setIsLoading(false);
     }
