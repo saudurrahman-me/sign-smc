@@ -161,7 +161,7 @@ export interface EventCertificate {
   updated_at: string;
 }
 
-export type AttendanceStatus = 'registered' | 'attended' | 'cancelled';
+export type AttendanceStatus = 'registered' | 'attended';
 
 export interface EventRegistration {
   id: string;

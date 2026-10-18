@@ -84,7 +84,7 @@ export const EventsSection: React.FC = () => {
       if (stored) {
         const parsed: EventRegistration[] = JSON.parse(stored);
         parsed.forEach((r) => {
-          if (r.attendance_status !== 'cancelled' && r.event_id) {
+          if (r.event_id) {
             regMap[r.event_id] = r;
           }
         });
@@ -109,7 +109,7 @@ export const EventsSection: React.FC = () => {
         const { data, error } = await query;
         if (!error && data) {
           data.forEach((r: EventRegistration) => {
-            if (r.attendance_status !== 'cancelled' && r.event_id) {
+            if (r.event_id) {
               regMap[r.event_id] = r;
             }
           });

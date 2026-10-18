@@ -171,7 +171,7 @@ export const AdminEventsPage: React.FC = () => {
       if (localStored) {
         const parsed: EventRegistration[] = JSON.parse(localStored);
         parsed.forEach((r) => {
-          if (r.attendance_status !== 'cancelled') {
+          if (r.event_id) {
             counts[r.event_id] = (counts[r.event_id] || 0) + 1;
           }
         });
@@ -189,7 +189,7 @@ export const AdminEventsPage: React.FC = () => {
         if (!error && data) {
           const dbCounts: Record<string, number> = {};
           data.forEach((r: { event_id: string; attendance_status: string }) => {
-            if (r.attendance_status !== 'cancelled') {
+            if (r.event_id) {
               dbCounts[r.event_id] = (dbCounts[r.event_id] || 0) + 1;
             }
           });
@@ -1251,13 +1251,6 @@ export const AdminEventsPage: React.FC = () => {
                       {attendees.filter((a) => a.attendance_status === 'attended').length}
                     </span>
                   </div>
-                  <div className="px-3.5 py-1.5 rounded-xl bg-rose-950/40 border border-rose-800/40 flex items-center gap-2 text-rose-300">
-                    <span className="w-2 h-2 rounded-full bg-rose-400" />
-                    <span>Cancelled:</span>
-                    <span className="font-bold text-rose-200">
-                      {attendees.filter((a) => a.attendance_status === 'cancelled').length}
-                    </span>
-                  </div>
                 </div>
 
                 {/* Batch Actions */}
@@ -1317,7 +1310,6 @@ export const AdminEventsPage: React.FC = () => {
                     <option value="all">All Registrations</option>
                     <option value="registered">Registered Only</option>
                     <option value="attended">Attended Only</option>
-                    <option value="cancelled">Cancelled Only</option>
                   </select>
                 </div>
               </div>
@@ -1439,25 +1431,13 @@ export const AdminEventsPage: React.FC = () => {
                                   type="button"
                                   disabled={isUpdatingStatusId === att.id}
                                   onClick={() => handleUpdateAttendanceStatus(att.id, 'attended')}
-                                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                                  className={`px-2.5 py-1 rounded-md transition-colors cursor-pointer ${
                                     att.attendance_status === 'attended'
                                       ? 'bg-cyan-600 text-white shadow-xs'
                                       : 'text-slate-400 hover:text-white'
                                   }`}
                                 >
                                   Attended
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={isUpdatingStatusId === att.id}
-                                  onClick={() => handleUpdateAttendanceStatus(att.id, 'cancelled')}
-                                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
-                                    att.attendance_status === 'cancelled'
-                                      ? 'bg-rose-700 text-white shadow-xs'
-                                      : 'text-slate-400 hover:text-white'
-                                  }`}
-                                >
-                                  Cancelled
                                 </button>
                               </div>
                             </td>

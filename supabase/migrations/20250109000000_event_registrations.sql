@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS public.event_registrations (
     mbbs_year TEXT DEFAULT 'MBBS - 3rd Year',
     student_id TEXT,
     questions_or_notes TEXT,
-    attendance_status TEXT NOT NULL DEFAULT 'registered' CHECK (attendance_status IN ('registered', 'attended', 'cancelled')),
+    attendance_status TEXT NOT NULL DEFAULT 'registered' CHECK (attendance_status IN ('registered', 'attended')),
     registration_code TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
