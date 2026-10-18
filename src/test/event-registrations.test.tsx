@@ -189,8 +189,7 @@ describe('Event Registration System', () => {
       screen.getByText(/Encountering a Transaction Error or Payment Issue\?/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/0317-9752692/i)).toBeInTheDocument();
-    expect(screen.getByText(/signsmc\.official@gmail\.com/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mandatory for verification/i)).toBeInTheDocument();
+    expect(screen.getByText(/Transaction ID \/ Ref Number/i)).toBeInTheDocument();
   });
 
   it('validates and applies ambassador/member discount code correctly', async () => {

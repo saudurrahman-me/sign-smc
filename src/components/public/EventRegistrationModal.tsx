@@ -1006,14 +1006,9 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
                       {/* Transaction ID Input (Mandatory reference) */}
                       <div className="space-y-1.5">
-                        <label className="block text-slate-300 font-semibold text-[11px] flex items-center justify-between">
-                          <span className="flex items-center gap-1.5">
-                            <span>Transaction ID / Ref Number</span>
-                            <span className="text-rose-400 font-bold">*</span>
-                          </span>
-                          <span className="text-[10px] text-amber-400 font-medium bg-amber-950/60 border border-amber-800/40 px-2 py-0.5 rounded">
-                            Mandatory for verification
-                          </span>
+                        <label className="block text-slate-300 font-semibold text-[11px] flex items-center gap-1.5">
+                          <span>Transaction ID / Ref Number</span>
+                          <span className="text-rose-400 font-bold">*</span>
                         </label>
                         <input
                           type="text"
