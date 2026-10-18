@@ -39,8 +39,9 @@ export default async function handler(req, res) {
         Authorization: `Bearer ${apiKey.trim()}`,
       },
       body: JSON.stringify({
-        from: 'SIGN SMC Chapter <onboarding@resend.dev>',
+        from: process.env.RESEND_FROM_EMAIL || 'SIGN SMC Chapter <onboarding@resend.dev>',
         to: [to],
+        reply_to: process.env.RESEND_REPLY_TO || 'signsmc.official@gmail.com',
         subject: subject,
         html: html,
         text: text,
