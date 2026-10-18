@@ -654,6 +654,42 @@ export const AdminEventsPage: React.FC = () => {
         ambassador_discount_percent: isPaid ? Number(ambassadorDiscountPercent) || 0 : 0,
       };
 
+      const basicPayload = {
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        event_date: eventDate,
+        start_time: startTime || null,
+        end_time: endTime || null,
+        venue: venue.trim(),
+        is_virtual: isVirtual,
+        organizer: organizer.trim(),
+        cover_image_url: coverImageUrl.trim() || null,
+        registration_url: registrationUrl.trim() || null,
+        is_published: isPublished,
+        updated_at: new Date().toISOString(),
+      };
+
+      const isMissingColumnError = (err: any): boolean => {
+        if (!err) return false;
+        const code = String(err.code || '');
+        const message = String(err.message || '').toLowerCase();
+        return (
+          code === 'PGRST204' ||
+          code === '42703' ||
+          message.includes('schema cache') ||
+          message.includes('column') ||
+          message.includes('does not exist') ||
+          message.includes('account_number') ||
+          message.includes('account_title') ||
+          message.includes('is_paid') ||
+          message.includes('registration_fee') ||
+          message.includes('bank_name') ||
+          message.includes('ambassador') ||
+          message.includes('payment_instructions')
+        );
+      };
+
       if (isDevSession) {
         let updatedList: EventItem[];
         if (editingEvent) {
@@ -688,70 +724,67 @@ export const AdminEventsPage: React.FC = () => {
           .eq('id', editingEvent.id)
           .select();
 
-        // Fallback if migration hasn't been executed
-        if (error && (error.code === '42703' || error.message?.includes('is_paid'))) {
-          const basicPayload = {
-            title: title.trim(),
-            description: description.trim(),
-            category,
-            event_date: eventDate,
-            start_time: startTime || null,
-            end_time: endTime || null,
-            venue: venue.trim(),
-            is_virtual: isVirtual,
-            organizer: organizer.trim(),
-            cover_image_url: coverImageUrl.trim() || null,
-            registration_url: registrationUrl.trim() || null,
-            is_published: isPublished,
-            updated_at: new Date().toISOString(),
-          };
-          const res = await supabase.from('events').update(basicPayload).eq('id', editingEvent.id).select();
+        // Fallback if payment migration hasn't been executed on Supabase yet
+        if (error && isMissingColumnError(error)) {
+          const res = await supabase
+            .from('events')
+            .update(basicPayload)
+            .eq('id', editingEvent.id)
+            .select();
           data = res.data;
           error = res.error;
         }
 
         if (error) throw error;
         if (!data || data.length === 0) {
-          throw new Error('Database permission denied: Supabase RLS blocked the update.');
+          throw new Error('Database permission denied: Your admin account does not have update permissions on events in Supabase. Please verify your account role in profiles is website_admin, event_manager, or super_admin.');
         }
       } else {
-        let { data, error } = await supabase.from('events').insert({
-          ...payload,
-          created_by: user?.id,
-        }).select();
-
-        // Fallback if migration hasn't been executed
-        if (error && (error.code === '42703' || error.message?.includes('is_paid'))) {
-          const basicPayload = {
-            title: title.trim(),
-            description: description.trim(),
-            category,
-            event_date: eventDate,
-            start_time: startTime || null,
-            end_time: endTime || null,
-            venue: venue.trim(),
-            is_virtual: isVirtual,
-            organizer: organizer.trim(),
-            cover_image_url: coverImageUrl.trim() || null,
-            registration_url: registrationUrl.trim() || null,
-            is_published: isPublished,
+        let { data, error } = await supabase
+          .from('events')
+          .insert({
+            ...payload,
             created_by: user?.id,
-          };
-          const res = await supabase.from('events').insert(basicPayload).select();
+          })
+          .select();
+
+        // Fallback if payment migration hasn't been executed on Supabase yet
+        if (error && isMissingColumnError(error)) {
+          const res = await supabase
+            .from('events')
+            .insert({
+              ...basicPayload,
+              created_by: user?.id,
+            })
+            .select();
           data = res.data;
           error = res.error;
         }
 
         if (error) throw error;
         if (!data || data.length === 0) {
-          throw new Error('Database permission denied: Supabase RLS blocked the insert.');
+          throw new Error('Database permission denied: Your admin account does not have insert permissions on events in Supabase. Please verify your account role in profiles is website_admin, event_manager, or super_admin.');
         }
       }
 
       setIsModalOpen(false);
       await fetchEvents();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error saving event';
+      let msg = 'Error saving event';
+      if (err instanceof Error) {
+        msg = err.message;
+      } else if (err && typeof err === 'object') {
+        const anyErr = err as Record<string, unknown>;
+        if (typeof anyErr.message === 'string' && anyErr.message.trim()) {
+          msg = anyErr.message;
+        } else if (typeof anyErr.error_description === 'string' && anyErr.error_description.trim()) {
+          msg = anyErr.error_description;
+        } else if (typeof anyErr.details === 'string' && anyErr.details.trim()) {
+          msg = anyErr.details;
+        }
+      } else if (typeof err === 'string' && err.trim()) {
+        msg = err;
+      }
       setFormError(msg);
     } finally {
       setIsSaving(false);
