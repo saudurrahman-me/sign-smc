@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Menu, X, Shield, User as UserIcon, LogOut } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { Menu, X, Shield, User as UserIcon, LogOut, Award } from 'lucide-react';
 import { SignLogo } from '../brand/SignLogo';
 import { useAuth } from '../../context/AuthContext';
 
 export const Navbar: React.FC = () => {
   const { user, profile, isWebsiteAdmin, isEventManager, isSuperAdmin, signOut } = useAuth();
+  const location = useLocation();
+  const isHomePage = location.pathname === '/';
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -18,13 +20,14 @@ export const Navbar: React.FC = () => {
   }, []);
 
   const navLinks = [
-    { name: 'Home', href: '#home' },
-    { name: 'About', href: '#about' },
-    { name: 'Mission & Vision', href: '#mission' },
-    { name: 'Leadership', href: '#leadership' },
-    { name: 'Events', href: '#events' },
-    { name: 'Membership', href: '#membership' },
-    { name: 'Contact', href: '#contact' },
+    { name: 'Home', href: '#home', isRoute: false },
+    { name: 'About', href: '#about', isRoute: false },
+    { name: 'Mission & Vision', href: '#mission', isRoute: false },
+    { name: 'Leadership', href: '#leadership', isRoute: false },
+    { name: 'Events', href: '#events', isRoute: false },
+    { name: 'Certificates', href: '/certificates', isRoute: true },
+    { name: 'Membership', href: '#membership', isRoute: false },
+    { name: 'Contact', href: '#contact', isRoute: false },
   ];
 
   const hasAdminAccess = isSuperAdmin || isWebsiteAdmin || isEventManager;
@@ -40,21 +43,42 @@ export const Navbar: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between">
           {/* Logo Branding */}
-          <a href="#home" className="focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg">
+          <Link to="/" className="focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg">
             <SignLogo variant="full" size="sm" inverted={true} />
-          </a>
+          </Link>
 
           {/* Desktop Navigation Links */}
           <nav className="hidden lg:flex items-center gap-6" aria-label="Main Navigation">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors focus:outline-none focus:text-emerald-400"
-              >
-                {link.name}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              if (link.isRoute) {
+                const isActive = location.pathname === link.href;
+                return (
+                  <Link
+                    key={link.name}
+                    to={link.href}
+                    className={`text-sm font-medium transition-colors focus:outline-none flex items-center gap-1.5 ${
+                      isActive
+                        ? 'text-emerald-400 font-bold'
+                        : 'text-slate-300 hover:text-emerald-400'
+                    }`}
+                  >
+                    {link.name === 'Certificates' && <Award className="w-3.5 h-3.5 text-emerald-400" />}
+                    <span>{link.name}</span>
+                  </Link>
+                );
+              }
+
+              const targetHref = isHomePage ? link.href : `/${link.href}`;
+              return (
+                <a
+                  key={link.name}
+                  href={targetHref}
+                  className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors focus:outline-none focus:text-emerald-400"
+                >
+                  {link.name}
+                </a>
+              );
+            })}
           </nav>
 
           {/* Right Action Buttons */}
@@ -123,16 +147,38 @@ export const Navbar: React.FC = () => {
       {isOpen && (
         <div className="lg:hidden border-t border-emerald-900/50 bg-[#031D12]/98 px-4 pt-3 pb-6 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col space-y-2">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                onClick={() => setIsOpen(false)}
-                className="px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:text-emerald-400 hover:bg-emerald-950/40 transition-colors"
-              >
-                {link.name}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              if (link.isRoute) {
+                const isActive = location.pathname === link.href;
+                return (
+                  <Link
+                    key={link.name}
+                    to={link.href}
+                    onClick={() => setIsOpen(false)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-base font-medium transition-colors ${
+                      isActive
+                        ? 'bg-emerald-950/60 text-emerald-400 font-bold border border-emerald-800/40'
+                        : 'text-slate-200 hover:text-emerald-400 hover:bg-emerald-950/40'
+                    }`}
+                  >
+                    {link.name === 'Certificates' && <Award className="w-4 h-4 text-emerald-400" />}
+                    <span>{link.name}</span>
+                  </Link>
+                );
+              }
+
+              const targetHref = isHomePage ? link.href : `/${link.href}`;
+              return (
+                <a
+                  key={link.name}
+                  href={targetHref}
+                  onClick={() => setIsOpen(false)}
+                  className="px-3 py-2 rounded-lg text-base font-medium text-slate-200 hover:text-emerald-400 hover:bg-emerald-950/40 transition-colors"
+                >
+                  {link.name}
+                </a>
+              );
+            })}
 
             <div className="pt-4 mt-2 border-t border-slate-800 flex flex-col gap-2">
               {user ? (

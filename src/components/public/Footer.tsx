@@ -1,5 +1,6 @@
 import React from 'react';
-import { Mail } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Mail, Award } from 'lucide-react';
 import { SignLogo } from '../brand/SignLogo';
 import { FacebookIcon, InstagramIcon } from '../brand/SocialIcons';
 
@@ -7,13 +8,14 @@ export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
 
   const footerLinks = [
-    { name: 'Home', href: '#home' },
-    { name: 'About Chapter', href: '#about' },
-    { name: 'Mission & Vision', href: '#mission' },
-    { name: 'Leadership', href: '#leadership' },
-    { name: 'Events Calendar', href: '#events' },
-    { name: 'Apply for Membership', href: '#membership' },
-    { name: 'Contact Inquiries', href: '#contact' },
+    { name: 'Home', href: '/#home', isRoute: false },
+    { name: 'About Chapter', href: '/#about', isRoute: false },
+    { name: 'Mission & Vision', href: '/#mission', isRoute: false },
+    { name: 'Leadership', href: '/#leadership', isRoute: false },
+    { name: 'Events Calendar', href: '/#events', isRoute: false },
+    { name: 'Event Certificates', href: '/certificates', isRoute: true },
+    { name: 'Apply for Membership', href: '/#membership', isRoute: false },
+    { name: 'Contact Inquiries', href: '/#contact', isRoute: false },
   ];
 
   return (
@@ -73,12 +75,22 @@ export const Footer: React.FC = () => {
             <ul className="space-y-2.5 text-xs">
               {footerLinks.map((link) => (
                 <li key={link.name}>
-                  <a
-                    href={link.href}
-                    className="text-slate-400 hover:text-emerald-400 transition-colors"
-                  >
-                    {link.name}
-                  </a>
+                  {link.isRoute ? (
+                    <Link
+                      to={link.href}
+                      className="text-slate-400 hover:text-emerald-400 transition-colors flex items-center gap-1.5"
+                    >
+                      <Award className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>{link.name}</span>
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-slate-400 hover:text-emerald-400 transition-colors"
+                    >
+                      {link.name}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

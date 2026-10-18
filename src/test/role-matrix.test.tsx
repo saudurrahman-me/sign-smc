@@ -7,6 +7,7 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     canManageLeadership: boolean;
     canManageContent: boolean;
     canReviewApplications: boolean;
+    canManageCertificates: boolean;
     canManageUserRoles: boolean;
     canViewAuditLogs: boolean;
   }
@@ -21,6 +22,7 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
       canManageLeadership: isWebsiteAdmin,
       canManageContent: isWebsiteAdmin,
       canReviewApplications: isSuperAdmin || isWebsiteAdmin, // Expanded to Website Admin & Super Admin
+      canManageCertificates: isEventManager || isWebsiteAdmin, // Event Manager, Website Admin & Super Admin
       canManageUserRoles: isSuperAdmin,   // Isolated to Super Admin
       canViewAuditLogs: isSuperAdmin,     // Isolated to Super Admin
     };
@@ -32,24 +34,27 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     expect(perms.canManageLeadership).toBe(true);
     expect(perms.canManageContent).toBe(true);
     expect(perms.canReviewApplications).toBe(true);
+    expect(perms.canManageCertificates).toBe(true);
     expect(perms.canManageUserRoles).toBe(true);
     expect(perms.canViewAuditLogs).toBe(true);
   });
 
-  it('Website Admin can manage events, leadership, content, and applications, but CANNOT access user roles or audit logs', () => {
+  it('Website Admin can manage events, leadership, content, applications, and certificates, but CANNOT access user roles or audit logs', () => {
     const perms = getPermissions('website_admin');
     expect(perms.canManageEvents).toBe(true);
     expect(perms.canManageLeadership).toBe(true);
     expect(perms.canManageContent).toBe(true);
     expect(perms.canReviewApplications).toBe(true);
+    expect(perms.canManageCertificates).toBe(true);
     // Explicit security boundary checks: User roles and Audit logs remain strictly Super Admin
     expect(perms.canManageUserRoles).toBe(false);
     expect(perms.canViewAuditLogs).toBe(false);
   });
 
-  it('Event Manager can manage events but CANNOT manage content, leadership, applications, or roles', () => {
+  it('Event Manager can manage events and certificates but CANNOT manage content, leadership, applications, or roles', () => {
     const perms = getPermissions('event_manager');
     expect(perms.canManageEvents).toBe(true);
+    expect(perms.canManageCertificates).toBe(true);
     // Explicit security boundary checks:
     expect(perms.canManageLeadership).toBe(false);
     expect(perms.canManageContent).toBe(false);
@@ -64,6 +69,7 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     expect(perms.canManageLeadership).toBe(false);
     expect(perms.canManageContent).toBe(false);
     expect(perms.canReviewApplications).toBe(false);
+    expect(perms.canManageCertificates).toBe(false);
     expect(perms.canManageUserRoles).toBe(false);
     expect(perms.canViewAuditLogs).toBe(false);
   });
@@ -74,6 +80,7 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     expect(perms.canManageLeadership).toBe(false);
     expect(perms.canManageContent).toBe(false);
     expect(perms.canReviewApplications).toBe(false);
+    expect(perms.canManageCertificates).toBe(false);
     expect(perms.canManageUserRoles).toBe(false);
     expect(perms.canViewAuditLogs).toBe(false);
   });

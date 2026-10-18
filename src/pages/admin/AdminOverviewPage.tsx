@@ -22,6 +22,7 @@ import {
   Loader2,
   X,
   ExternalLink,
+  Award,
 } from 'lucide-react';
 
 export const AdminOverviewPage: React.FC = () => {
@@ -34,6 +35,8 @@ export const AdminOverviewPage: React.FC = () => {
     publishedLeadership: 0,
     pendingApps: 0,
     totalApps: 0,
+    certificatesCount: 0,
+    pendingCertificates: 0,
     usersCount: 0,
   });
 
@@ -111,6 +114,8 @@ export const AdminOverviewPage: React.FC = () => {
           publishedLeadership: 7,
           pendingApps: 1,
           totalApps: 2,
+          certificatesCount: 2,
+          pendingCertificates: 1,
           usersCount: 4,
         });
         setIsLoading(false);
@@ -157,6 +162,33 @@ export const AdminOverviewPage: React.FC = () => {
               totalApps: 2,
               pendingApps: 1,
             }));
+          }
+        }
+
+        // Fetch certificates (Event Manager, Website Admin & Super Admin)
+        if (isEventManager || isSuperAdmin || isWebsiteAdmin) {
+          const { data: certData } = await supabase.from('event_certificates').select('id, status');
+          if (certData && isMounted && certData.length > 0) {
+            setStats((prev) => ({
+              ...prev,
+              certificatesCount: certData.length,
+              pendingCertificates: certData.filter((c) => c.status === 'pending').length,
+            }));
+          } else {
+            // Check local storage fallback
+            try {
+              const local = localStorage.getItem('sign_user_certificates');
+              if (local && isMounted) {
+                const parsed = JSON.parse(local);
+                setStats((prev) => ({
+                  ...prev,
+                  certificatesCount: parsed.length,
+                  pendingCertificates: parsed.filter((c: any) => c.status === 'pending').length,
+                }));
+              }
+            } catch {
+              // ignore
+            }
           }
         }
 
@@ -328,6 +360,23 @@ export const AdminOverviewPage: React.FC = () => {
               <div className="mt-2 text-[11px] text-slate-400 flex items-center gap-1">
                 <CheckCircle className="w-3 h-3 text-teal-400" />
                 <span>{stats.publishedEvents} published to public</span>
+              </div>
+            </div>
+          )}
+
+          {/* Certificates KPI (Event Manager, Website Admin & Super Admin) */}
+          {(isEventManager || isSuperAdmin || isWebsiteAdmin) && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-slate-700 transition-all">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold text-slate-400">Event Certificates</span>
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400">
+                  <Award className="w-4 h-4" />
+                </div>
+              </div>
+              <div className="text-2xl font-black text-white">{stats.certificatesCount}</div>
+              <div className="mt-2 text-[11px] text-amber-400 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                <span>{stats.pendingCertificates} pending review</span>
               </div>
             </div>
           )}
@@ -540,6 +589,24 @@ export const AdminOverviewPage: React.FC = () => {
                 </p>
               </div>
               <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-purple-400 transition-colors" />
+            </Link>
+          )}
+
+          {(isEventManager || isSuperAdmin || isWebsiteAdmin) && (
+            <Link
+              to="/admin/certificates"
+              className="p-4 rounded-xl bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 hover:border-amber-500/50 transition-all group flex items-start justify-between"
+            >
+              <div>
+                <Award className="w-5 h-5 text-amber-400 mb-2" />
+                <h3 className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+                  Verify & Issue Certificates
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Review student requests, upload PDFs, verify attendance & send email confirmation.
+                </p>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-amber-400 transition-colors" />
             </Link>
           )}
         </div>

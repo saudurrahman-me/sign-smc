@@ -9,6 +9,7 @@ import { LoginPage } from './pages/auth/LoginPage';
 import { ResetPasswordPage } from './pages/auth/ResetPasswordPage';
 import { UnauthorizedPage } from './pages/auth/UnauthorizedPage';
 import { MembershipStatusPage } from './pages/MembershipStatusPage';
+import { CertificatesPage } from './pages/CertificatesPage';
 
 // Admin System Pages
 import { AdminLayout } from './pages/admin/AdminLayout';
@@ -16,6 +17,7 @@ import { AdminOverviewPage } from './pages/admin/AdminOverviewPage';
 import { AdminEventsPage } from './pages/admin/AdminEventsPage';
 import { AdminLeadershipPage } from './pages/admin/AdminLeadershipPage';
 import { AdminApplicationsPage } from './pages/admin/AdminApplicationsPage';
+import { AdminCertificatesPage } from './pages/admin/AdminCertificatesPage';
 import { AdminContentSettingsPage } from './pages/admin/AdminContentSettingsPage';
 import { AdminUsersPage } from './pages/admin/AdminUsersPage';
 import { AdminAuditLogsPage } from './pages/admin/AdminAuditLogsPage';
@@ -25,8 +27,9 @@ export const App: React.FC = () => {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Single-Page Website */}
+          {/* Public Single-Page Website & Portal Pages */}
           <Route path="/" element={<HomePage />} />
+          <Route path="/certificates" element={<CertificatesPage />} />
 
           {/* Authentication & User Portal */}
           <Route path="/login" element={<LoginPage />} />
@@ -96,6 +99,16 @@ export const App: React.FC = () => {
               element={
                 <AdminRoute allowedRoles={['website_admin', 'super_admin']}>
                   <AdminApplicationsPage />
+                </AdminRoute>
+              }
+            />
+
+            {/* Certificates Management (Super Admin, Website Admin, Event Manager) */}
+            <Route
+              path="certificates"
+              element={
+                <AdminRoute allowedRoles={['super_admin', 'website_admin', 'event_manager']}>
+                  <AdminCertificatesPage />
                 </AdminRoute>
               }
             />

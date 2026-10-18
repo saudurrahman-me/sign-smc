@@ -85,6 +85,7 @@ describe('Production Readiness & Security Controls Audit', () => {
       const leadershipAllowed: UserRole[] = ['website_admin', 'super_admin'];
       const settingsAllowed: UserRole[] = ['website_admin', 'super_admin'];
       const applicationsAllowed: UserRole[] = ['website_admin', 'super_admin'];
+      const certificatesAllowed: UserRole[] = ['event_manager', 'website_admin', 'super_admin'];
       const usersAllowed: UserRole[] = ['super_admin'];
       const auditAllowed: UserRole[] = ['super_admin'];
 
@@ -93,17 +94,20 @@ describe('Production Readiness & Security Controls Audit', () => {
       expect(isRouteAuthorized('member', leadershipAllowed)).toBe(false);
       expect(isRouteAuthorized('member', settingsAllowed)).toBe(false);
       expect(isRouteAuthorized('member', applicationsAllowed)).toBe(false);
+      expect(isRouteAuthorized('member', certificatesAllowed)).toBe(false);
       expect(isRouteAuthorized('member', usersAllowed)).toBe(false);
       expect(isRouteAuthorized('member', auditAllowed)).toBe(false);
 
-      // Event manager allowed ONLY in events and overview
+      // Event manager allowed in events, certificates, and overview
       expect(isRouteAuthorized('event_manager', eventsAllowed)).toBe(true);
+      expect(isRouteAuthorized('event_manager', certificatesAllowed)).toBe(true);
       expect(isRouteAuthorized('event_manager', leadershipAllowed)).toBe(false);
       expect(isRouteAuthorized('event_manager', applicationsAllowed)).toBe(false);
       expect(isRouteAuthorized('event_manager', usersAllowed)).toBe(false);
 
-      // Website admin allowed in events, leadership, settings, applications, overview
+      // Website admin allowed in events, certificates, leadership, settings, applications, overview
       expect(isRouteAuthorized('website_admin', eventsAllowed)).toBe(true);
+      expect(isRouteAuthorized('website_admin', certificatesAllowed)).toBe(true);
       expect(isRouteAuthorized('website_admin', leadershipAllowed)).toBe(true);
       expect(isRouteAuthorized('website_admin', settingsAllowed)).toBe(true);
       expect(isRouteAuthorized('website_admin', applicationsAllowed)).toBe(true);
@@ -112,6 +116,7 @@ describe('Production Readiness & Security Controls Audit', () => {
 
       // Super admin allowed everywhere
       expect(isRouteAuthorized('super_admin', eventsAllowed)).toBe(true);
+      expect(isRouteAuthorized('super_admin', certificatesAllowed)).toBe(true);
       expect(isRouteAuthorized('super_admin', leadershipAllowed)).toBe(true);
       expect(isRouteAuthorized('super_admin', settingsAllowed)).toBe(true);
       expect(isRouteAuthorized('super_admin', applicationsAllowed)).toBe(true);
@@ -229,11 +234,17 @@ describe('Production Readiness & Security Controls Audit', () => {
         public: false,
         allowedUploadRoles: ['member', 'super_admin'],
       },
+      'certificates': {
+        id: 'certificates',
+        public: true,
+        allowedUploadRoles: ['event_manager', 'website_admin', 'super_admin'],
+      },
     };
 
-    it('configures public access for portraits and banners, but strictly private for applicant documents', () => {
+    it('configures public access for portraits, banners, and certificates, but strictly private for applicant documents', () => {
       expect(BUCKETS['leadership-portraits'].public).toBe(true);
       expect(BUCKETS['event-banners'].public).toBe(true);
+      expect(BUCKETS['certificates'].public).toBe(true);
       expect(BUCKETS['applicant-documents'].public).toBe(false);
     });
 
@@ -244,9 +255,14 @@ describe('Production Readiness & Security Controls Audit', () => {
       // Website Admin can upload event banners
       expect(BUCKETS['event-banners'].allowedUploadRoles.includes('website_admin')).toBe(true);
 
-      // Super Admin can upload to both public buckets
+      // Event Manager and Website Admin can upload certificates
+      expect(BUCKETS['certificates'].allowedUploadRoles.includes('event_manager')).toBe(true);
+      expect(BUCKETS['certificates'].allowedUploadRoles.includes('website_admin')).toBe(true);
+
+      // Super Admin can upload to all public buckets
       expect(BUCKETS['leadership-portraits'].allowedUploadRoles.includes('super_admin')).toBe(true);
       expect(BUCKETS['event-banners'].allowedUploadRoles.includes('super_admin')).toBe(true);
+      expect(BUCKETS['certificates'].allowedUploadRoles.includes('super_admin')).toBe(true);
     });
   });
 });

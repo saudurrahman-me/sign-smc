@@ -135,3 +135,29 @@ export interface AuditLog {
   details: Record<string, unknown>;
   created_at: string;
 }
+
+export type CertificateStatus = 'pending' | 'approved' | 'declined';
+
+export interface EventCertificate {
+  id: string;
+  user_id: string;
+  event_id?: string | null;
+  event_title: string;
+  student_name: string;
+  student_email: string;
+  student_id?: string | null;
+  college_name?: string | null;
+  mbbs_year?: string | null;
+  attendance_notes?: string | null;
+  status: CertificateStatus;
+  certificate_code?: string | null;
+  certificate_file_url?: string | null;
+  certificate_file_path?: string | null;
+  issued_at?: string | null;
+  reviewer_notes?: string | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

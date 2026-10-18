@@ -7,6 +7,7 @@ import {
   Calendar,
   Users,
   FileCheck,
+  Award,
   ShieldCheck,
   Settings,
   History,
@@ -35,6 +36,12 @@ export const AdminLayout: React.FC = () => {
       path: '/admin/events',
       icon: Calendar,
       visible: isEventManager || isSuperAdmin || isWebsiteAdmin,
+    },
+    {
+      name: 'Certificates Management',
+      path: '/admin/certificates',
+      icon: Award,
+      visible: isSuperAdmin || isWebsiteAdmin || isEventManager,
     },
     {
       name: 'Leadership & Nominees',
