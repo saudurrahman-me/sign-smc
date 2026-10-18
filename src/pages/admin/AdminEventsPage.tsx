@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { EventItem, EventCategory } from '../../types/database.types';
 import { useAuth } from '../../context/AuthContext';
+import { compressPaymentReceipt } from '../../lib/image-compressor';
 import {
   Calendar,
   Plus,
@@ -15,6 +16,12 @@ import {
   Filter,
   AlertCircle,
   X,
+  Upload,
+  Image as ImageIcon,
+  Loader2,
+  CheckCircle2,
+  RefreshCw,
+  Link as LinkIcon,
 } from 'lucide-react';
 
 export const AdminEventsPage: React.FC = () => {
@@ -39,6 +46,11 @@ export const AdminEventsPage: React.FC = () => {
   const [isVirtual, setIsVirtual] = useState(false);
   const [organizer, setOrganizer] = useState('SIGN SMC Chapter');
   const [coverImageUrl, setCoverImageUrl] = useState('');
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageUploadError, setImageUploadError] = useState<string | null>(null);
+  const [showUrlInput, setShowUrlInput] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [isPublished, setIsPublished] = useState(false);
 
@@ -149,6 +161,8 @@ export const AdminEventsPage: React.FC = () => {
     setIsVirtual(false);
     setOrganizer('SIGN SMC Chapter');
     setCoverImageUrl('');
+    setImageUploadError(null);
+    setShowUrlInput(false);
     setRegistrationUrl('');
     setIsPublished(false);
     setFormError(null);
@@ -167,10 +181,76 @@ export const AdminEventsPage: React.FC = () => {
     setIsVirtual(ev.is_virtual);
     setOrganizer(ev.organizer);
     setCoverImageUrl(ev.cover_image_url || '');
+    setImageUploadError(null);
+    setShowUrlInput(false);
     setRegistrationUrl(ev.registration_url || '');
     setIsPublished(ev.is_published);
     setFormError(null);
     setIsModalOpen(true);
+  };
+
+  // Upload and optimize event banner
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setImageUploadError('Please select a valid image file (PNG, JPG, or WebP).');
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setImageUploadError('Image exceeds 15MB limit. Please choose a smaller photo.');
+      return;
+    }
+
+    setIsUploadingImage(true);
+    setImageUploadError(null);
+
+    try {
+      // Compress to optimal web banner dimensions (1600x900)
+      const compressed = await compressPaymentReceipt(file, 1600, 900, 0.85);
+
+      if (!isSupabaseConfigured || isDevSession) {
+        setCoverImageUrl(compressed.previewUrl);
+        return;
+      }
+
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `banner_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+      const filePath = `banners/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('event-banners')
+        .upload(filePath, compressed.file, {
+          upsert: true,
+          contentType: compressed.file.type || 'image/jpeg',
+        });
+
+      if (uploadError) {
+        console.warn('[SIGN Events] Storage upload warning:', uploadError.message);
+        setCoverImageUrl(compressed.previewUrl);
+        return;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('event-banners')
+        .getPublicUrl(filePath);
+
+      if (publicUrlData?.publicUrl) {
+        setCoverImageUrl(publicUrlData.publicUrl);
+      } else {
+        setCoverImageUrl(compressed.previewUrl);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Image upload failed';
+      setImageUploadError(msg);
+    } finally {
+      setIsUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -205,7 +285,7 @@ export const AdminEventsPage: React.FC = () => {
         if (editingEvent) {
           updatedList = events.map((e) =>
             e.id === editingEvent.id
-              ? { ...e, ...payload, cover_image_url: payload.cover_image_url || e.cover_image_url }
+              ? { ...e, ...payload, cover_image_url: payload.cover_image_url }
               : e
           );
         } else {
@@ -213,9 +293,7 @@ export const AdminEventsPage: React.FC = () => {
             id: `dev-evt-${Date.now()}`,
             ...payload,
             created_by: user?.id || null,
-            cover_image_url:
-              payload.cover_image_url ||
-              'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
+            cover_image_url: payload.cover_image_url,
             created_at: new Date().toISOString(),
           };
           updatedList = [newEv, ...events];
@@ -405,9 +483,24 @@ export const AdminEventsPage: React.FC = () => {
               <tbody className="divide-y divide-slate-800 text-slate-300">
                 {filteredEvents.map((ev) => (
                   <tr key={ev.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="py-4 px-4 max-w-xs">
-                      <div className="font-bold text-white text-sm line-clamp-1">{ev.title}</div>
-                      <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{ev.description}</p>
+                    <td className="py-4 px-4 max-w-sm">
+                      <div className="flex items-center gap-3">
+                        {ev.cover_image_url ? (
+                          <img
+                            src={ev.cover_image_url}
+                            alt=""
+                            className="w-12 h-9 rounded-lg object-cover border border-slate-700 shrink-0 bg-slate-950"
+                          />
+                        ) : (
+                          <div className="w-12 h-9 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center shrink-0 text-slate-600">
+                            <ImageIcon className="w-4 h-4" />
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-bold text-white text-sm line-clamp-1">{ev.title}</div>
+                          <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5">{ev.description}</p>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-800 text-teal-400 border border-slate-700">
@@ -625,32 +718,151 @@ export const AdminEventsPage: React.FC = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Cover Image URL (Optional)
+              {/* Event Cover Image / Banner */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-slate-300 font-semibold">
+                    Event Cover Banner (16:9 Image)
                   </label>
-                  <input
-                    type="text"
-                    value={coverImageUrl}
-                    onChange={(e) => setCoverImageUrl(e.target.value)}
-                    placeholder="https://... or /banners/... image link"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowUrlInput(!showUrlInput)}
+                    className="text-[11px] text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                  >
+                    <LinkIcon className="w-3 h-3" />
+                    <span>{showUrlInput ? 'Hide URL input' : 'Or paste image URL'}</span>
+                  </button>
                 </div>
 
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Registration Link (Optional)
-                  </label>
-                  <input
-                    type="url"
-                    value={registrationUrl}
-                    onChange={(e) => setRegistrationUrl(e.target.value)}
-                    placeholder="https://forms.gle/... or meeting link"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
-                </div>
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/png,image/jpeg,image/webp,image/jpg"
+                  className="hidden"
+                />
+
+                {/* Upload Error Alert */}
+                {imageUploadError && (
+                  <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-[11px] text-rose-300 flex items-center justify-between">
+                    <span>{imageUploadError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setImageUploadError(null)}
+                      className="text-rose-400 hover:text-rose-200"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Live Banner Preview OR Upload Dropzone */}
+                {coverImageUrl ? (
+                  <div className="relative group rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-video max-h-56 shadow-lg">
+                    <img
+                      src={coverImageUrl}
+                      alt="Event Banner Preview"
+                      className="w-full h-full object-cover"
+                    />
+
+                    {/* Active Badge */}
+                    <div className="absolute top-2.5 left-2.5">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-950/85 backdrop-blur-md text-emerald-300 border border-emerald-500/30">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        Active Banner
+                      </span>
+                    </div>
+
+                    {/* Action Bar on hover/overlay */}
+                    <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploadingImage}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-teal-500 hover:bg-teal-400 text-slate-950 transition-colors cursor-pointer shadow-md"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Change Image</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setCoverImageUrl('')}
+                        disabled={isUploadingImage}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 transition-colors cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+
+                    {isUploadingImage && (
+                      <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
+                        <Loader2 className="w-6 h-6 text-teal-400 animate-spin" />
+                        <span className="text-xs text-slate-300 font-medium">Uploading new banner...</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div
+                    onClick={() => !isUploadingImage && fileInputRef.current?.click()}
+                    className={`border-2 border-dashed border-slate-700 hover:border-teal-400/60 rounded-xl p-6 text-center cursor-pointer transition-all bg-slate-950/50 hover:bg-slate-950 group ${
+                      isUploadingImage ? 'pointer-events-none opacity-60' : ''
+                    }`}
+                  >
+                    {isUploadingImage ? (
+                      <div className="flex flex-col items-center py-2">
+                        <Loader2 className="w-8 h-8 text-teal-400 animate-spin mb-2" />
+                        <span className="text-xs text-slate-300 font-semibold">
+                          Optimizing & Uploading Image...
+                        </span>
+                        <span className="text-[10px] text-slate-500 mt-0.5">
+                          Saving to Supabase event-banners storage
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <div className="w-12 h-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center mb-2 group-hover:scale-105 transition-transform text-teal-400">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-semibold text-white group-hover:text-teal-300 transition-colors">
+                          Click to upload event banner image
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          PNG, JPG, or WebP up to 15MB • Auto-compressed to 16:9 HD banner
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Optional Direct URL Input Field */}
+                {showUrlInput && (
+                  <div className="pt-1 animate-in fade-in duration-200">
+                    <input
+                      type="url"
+                      value={coverImageUrl}
+                      onChange={(e) => setCoverImageUrl(e.target.value)}
+                      placeholder="https://images.unsplash.com/... or public image link"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Registration Link */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Registration Link (Optional)
+                </label>
+                <input
+                  type="url"
+                  value={registrationUrl}
+                  onChange={(e) => setRegistrationUrl(e.target.value)}
+                  placeholder="https://forms.gle/... or meeting link"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                />
               </div>
 
               <div className="flex items-center gap-6 pt-2">

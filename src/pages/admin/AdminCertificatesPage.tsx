@@ -49,6 +49,7 @@ export const AdminCertificatesPage: React.FC = () => {
   const [mailtoBackupUrl, setMailtoBackupUrl] = useState<string | null>(null);
   const [sendEmailNotification, setSendEmailNotification] = useState(false);
   const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
+  const [dbWarning, setDbWarning] = useState<string | null>(null);
 
   // Direct Issue Modal State
   const [isDirectIssueOpen, setIsDirectIssueOpen] = useState(false);
@@ -146,16 +147,19 @@ export const AdminCertificatesPage: React.FC = () => {
 
       if (error) {
         console.warn('[SIGN Admin Certificates] Fetch error:', error.message);
+        if (error.code === 'PGRST205') {
+          setDbWarning(
+            'The "event_certificates" table does not exist in Supabase yet. Please execute the certificates migration in your Supabase SQL Editor so certificate applications are stored centrally and synced across all admins.'
+          );
+        }
         setCertificates(localCerts);
       } else if (data) {
+        setDbWarning(null);
         const sanitized = (data as EventCertificate[]).filter(
           (c) => !c.student_email?.toLowerCase().includes('btwerror')
         );
-        const merged = [
-          ...localCerts.filter((l) => !sanitized.some((d) => d.id === l.id)),
-          ...sanitized,
-        ];
-        setCertificates(merged);
+        // Supabase is our single real-time source of truth for the entire admin team
+        setCertificates(sanitized);
       } else {
         setCertificates(localCerts);
       }
@@ -633,6 +637,17 @@ export const AdminCertificatesPage: React.FC = () => {
           <span>Direct Issue Certificate</span>
         </button>
       </div>
+
+      {/* Supabase Missing Table Warning */}
+      {dbWarning && (
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-amber-200 animate-in fade-in duration-300">
+          <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+          <div className="text-xs sm:text-sm space-y-1">
+            <p className="font-bold text-amber-300">Action Required: Remote Database Setup</p>
+            <p className="text-amber-200/90 leading-relaxed">{dbWarning}</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

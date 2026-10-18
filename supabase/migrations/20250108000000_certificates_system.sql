@@ -3,7 +3,38 @@
 -- Migration: 20250108000000_certificates_system.sql
 -- ==============================================================================
 
--- 1. Create event_certificates table
+-- 1. Helper Functions (Idempotent definitions)
+CREATE OR REPLACE FUNCTION public.is_super_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE((SELECT role = 'super_admin' FROM public.profiles WHERE id = auth.uid()), false);
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_website_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE((SELECT role IN ('super_admin', 'website_admin') FROM public.profiles WHERE id = auth.uid()), false);
+$$;
+
+CREATE OR REPLACE FUNCTION public.is_event_manager()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT COALESCE((SELECT role IN ('super_admin', 'event_manager') FROM public.profiles WHERE id = auth.uid()), false);
+$$;
+
+-- 2. Create event_certificates table
 CREATE TABLE IF NOT EXISTS public.event_certificates (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -35,8 +66,13 @@ CREATE INDEX IF NOT EXISTS idx_event_certificates_status ON public.event_certifi
 -- Enable RLS
 ALTER TABLE public.event_certificates ENABLE ROW LEVEL SECURITY;
 
--- 2. RLS Policies
+-- Permissions
+GRANT SELECT ON TABLE public.event_certificates TO anon;
+GRANT ALL ON TABLE public.event_certificates TO authenticated, service_role;
+
+-- 3. RLS Policies
 -- Users can view their own requests, or admins can view all
+DROP POLICY IF EXISTS "Users can view own certificates" ON public.event_certificates;
 CREATE POLICY "Users can view own certificates"
     ON public.event_certificates FOR SELECT
     USING (
@@ -47,16 +83,19 @@ CREATE POLICY "Users can view own certificates"
     );
 
 -- Public can verify approved certificates by code or QR link
+DROP POLICY IF EXISTS "Public can view approved certificates by code" ON public.event_certificates;
 CREATE POLICY "Public can view approved certificates by code"
     ON public.event_certificates FOR SELECT
     USING (status = 'approved' AND certificate_code IS NOT NULL);
 
 -- Authenticated users can submit a certificate request for themselves
+DROP POLICY IF EXISTS "Authenticated users can submit certificate request" ON public.event_certificates;
 CREATE POLICY "Authenticated users can submit certificate request"
     ON public.event_certificates FOR INSERT
     WITH CHECK (auth.uid() = user_id);
 
 -- Admins (super_admin, website_admin, event_manager) can review and issue certificates
+DROP POLICY IF EXISTS "Admins can update certificate requests" ON public.event_certificates;
 CREATE POLICY "Admins can update certificate requests"
     ON public.event_certificates FOR UPDATE
     USING (
@@ -70,6 +109,7 @@ CREATE POLICY "Admins can update certificate requests"
         OR public.is_super_admin()
     );
 
+DROP POLICY IF EXISTS "Admins can delete certificate requests" ON public.event_certificates;
 CREATE POLICY "Admins can delete certificate requests"
     ON public.event_certificates FOR DELETE
     USING (
@@ -78,7 +118,7 @@ CREATE POLICY "Admins can delete certificate requests"
         OR public.is_super_admin()
     );
 
--- 3. Storage Bucket for Certificates
+-- 4. Storage Bucket for Certificates
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('certificates', 'certificates', true)
 ON CONFLICT (id) DO NOTHING;

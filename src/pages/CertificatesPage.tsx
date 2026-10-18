@@ -437,21 +437,12 @@ export const CertificatesPage: React.FC = () => {
     };
 
     try {
-      // 1. Cache locally for instant UX
-      try {
-        const stored = localStorage.getItem('sign_user_certificates');
-        const existing: EventCertificate[] = stored ? JSON.parse(stored) : [];
-        const updated = [newRequest, ...existing.filter((e) => e.id !== newRequest.id)];
-        localStorage.setItem('sign_user_certificates', JSON.stringify(updated));
-      } catch {
-        // ignore
-      }
-
-      // 2. Persist to Supabase if configured
+      // 1. Persist to Supabase if configured
       if (isSupabaseConfigured) {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newRequest.event_id || '');
         const { error } = await supabase.from('event_certificates').insert({
           user_id: user.id,
-          event_id: newRequest.event_id,
+          event_id: isUuid ? newRequest.event_id : null,
           event_title: newRequest.event_title,
           student_name: newRequest.student_name,
           student_email: newRequest.student_email,
@@ -463,8 +454,25 @@ export const CertificatesPage: React.FC = () => {
         });
 
         if (error) {
-          console.warn('[SIGN Certificates] Insert error:', error.message);
+          console.error('[SIGN Certificates] Insert error:', error.message);
+          setApplyErrorMsg(
+            error.code === 'PGRST205'
+              ? 'Database setup in progress: The event_certificates table has not been created in Supabase yet. Please notify the administrator to run the database migration.'
+              : `Unable to submit application: ${error.message}`
+          );
+          setIsSubmitting(false);
+          return;
         }
+      }
+
+      // 2. Cache locally for instant UX
+      try {
+        const stored = localStorage.getItem('sign_user_certificates');
+        const existing: EventCertificate[] = stored ? JSON.parse(stored) : [];
+        const updated = [newRequest, ...existing.filter((e) => e.id !== newRequest.id)];
+        localStorage.setItem('sign_user_certificates', JSON.stringify(updated));
+      } catch {
+        // ignore
       }
 
       setApplySuccessMsg('Your certificate request has been submitted successfully! The organizing committee will verify your attendance record and notify you.');
