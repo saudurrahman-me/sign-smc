@@ -34,7 +34,7 @@ export const AdminLayout: React.FC = () => {
       name: 'Events Management',
       path: '/admin/events',
       icon: Calendar,
-      visible: isEventManager || isSuperAdmin,
+      visible: isEventManager || isSuperAdmin || isWebsiteAdmin,
     },
     {
       name: 'Leadership & Nominees',
@@ -46,7 +46,7 @@ export const AdminLayout: React.FC = () => {
       name: 'Membership Applications',
       path: '/admin/applications',
       icon: FileCheck,
-      visible: isSuperAdmin, // Strictly isolated to Super Admin per security requirement
+      visible: isSuperAdmin || isWebsiteAdmin,
     },
     {
       name: 'Content & Settings',

@@ -76,7 +76,9 @@ export const AdminContentSettingsPage: React.FC = () => {
     const loadData = async () => {
       // Check dev session storage first for immediate preview updates
       try {
-        const cached = sessionStorage.getItem('sign_site_settings');
+        const cached =
+          localStorage.getItem('sign_site_settings') ||
+          sessionStorage.getItem('sign_site_settings');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && isMounted) {
@@ -261,7 +263,11 @@ export const AdminContentSettingsPage: React.FC = () => {
     };
 
     try {
+      localStorage.setItem('sign_site_settings', JSON.stringify(settingsPayload));
       sessionStorage.setItem('sign_site_settings', JSON.stringify(settingsPayload));
+      window.dispatchEvent(
+        new CustomEvent('sign_settings_updated', { detail: settingsPayload })
+      );
     } catch {
       // ignore
     }

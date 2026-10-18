@@ -93,9 +93,19 @@ export const AdminApplicationsPage: React.FC = () => {
     };
 
     try {
-      // 1. Immediate session persistence for dev & fast feedback
-      sessionStorage.setItem('sign_site_settings', JSON.stringify(updatedSettings));
+      // 1. Immediate local persistence for dev & real-time UI synchronization
+      try {
+        localStorage.setItem('sign_site_settings', JSON.stringify(updatedSettings));
+        sessionStorage.setItem('sign_site_settings', JSON.stringify(updatedSettings));
+      } catch {
+        // ignore
+      }
       setSiteSettings(updatedSettings);
+
+      // Notify other components across the app in real time
+      window.dispatchEvent(
+        new CustomEvent('sign_settings_updated', { detail: updatedSettings })
+      );
 
       // 2. Persist to Supabase if connected
       if (isSupabaseConfigured) {
@@ -111,7 +121,20 @@ export const AdminApplicationsPage: React.FC = () => {
           })
           .eq('id', 1);
 
-        if (error) {
+        // Safe fallback if new columns are not yet added to remote database schema
+        if (error && (error.message?.includes('column') || (error as { code?: string }).code === '42703')) {
+          const { error: fallbackErr } = await supabase
+            .from('site_settings')
+            .update({
+              membership_open: updatedSettings.membership_open,
+              updated_at: updatedSettings.updated_at,
+            })
+            .eq('id', 1);
+
+          if (fallbackErr) {
+            console.warn('[SIGN Admin Applications] Fallback update failed:', fallbackErr.message);
+          }
+        } else if (error) {
           console.warn('[SIGN Admin Applications] Supabase schedule update error:', error.message);
         }
       }
@@ -234,10 +257,12 @@ export const AdminApplicationsPage: React.FC = () => {
   useEffect(() => {
     fetchApplications();
 
-    // Load site settings (with session cache fallback)
+    // Load site settings (with localStorage & sessionStorage cache fallback)
     const loadSettings = async () => {
       try {
-        const cached = sessionStorage.getItem('sign_site_settings');
+        const cached =
+          localStorage.getItem('sign_site_settings') ||
+          sessionStorage.getItem('sign_site_settings');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed) setSiteSettings((prev) => ({ ...prev, ...parsed }));
@@ -264,6 +289,20 @@ export const AdminApplicationsPage: React.FC = () => {
     };
 
     loadSettings();
+
+    const handleSettingsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail) {
+        setSiteSettings((prev) => ({ ...prev, ...customEvent.detail }));
+      } else {
+        loadSettings();
+      }
+    };
+
+    window.addEventListener('sign_settings_updated', handleSettingsUpdated);
+    return () => {
+      window.removeEventListener('sign_settings_updated', handleSettingsUpdated);
+    };
   }, []);
 
   const intakeEvaluation = evaluateMembershipIntake(siteSettings);

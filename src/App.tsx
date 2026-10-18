@@ -54,11 +54,11 @@ export const App: React.FC = () => {
             {/* Overview dashboard for all three roles */}
             <Route index element={<AdminOverviewPage />} />
 
-            {/* Event Manager & Super Admin */}
+            {/* Event Manager, Website Admin & Super Admin */}
             <Route
               path="events"
               element={
-                <AdminRoute allowedRoles={['event_manager', 'super_admin']}>
+                <AdminRoute allowedRoles={['event_manager', 'website_admin', 'super_admin']}>
                   <AdminEventsPage />
                 </AdminRoute>
               }
@@ -90,11 +90,11 @@ export const App: React.FC = () => {
               }
             />
 
-            {/* Super Admin Strictly Isolated */}
+            {/* Membership Applications: Website Admin & Super Admin */}
             <Route
               path="applications"
               element={
-                <AdminRoute allowedRoles={['super_admin']}>
+                <AdminRoute allowedRoles={['website_admin', 'super_admin']}>
                   <AdminApplicationsPage />
                 </AdminRoute>
               }

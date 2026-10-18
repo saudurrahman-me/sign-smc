@@ -43,12 +43,14 @@ export const MembershipSection: React.FC = () => {
     }
   }, [location.search, user]);
 
-  // Load site settings (with session cache fallback)
+  // Load site settings (with localStorage & session cache fallback)
   useEffect(() => {
     let isMounted = true;
     const loadSettings = async () => {
       try {
-        const cached = sessionStorage.getItem('sign_site_settings');
+        const cached =
+          localStorage.getItem('sign_site_settings') ||
+          sessionStorage.getItem('sign_site_settings');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && isMounted) {
@@ -77,8 +79,21 @@ export const MembershipSection: React.FC = () => {
     };
 
     loadSettings();
+
+    const handleSettingsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail && isMounted) {
+        setSiteSettings((prev) => ({ ...prev, ...customEvent.detail }));
+      } else {
+        loadSettings();
+      }
+    };
+
+    window.addEventListener('sign_settings_updated', handleSettingsUpdated);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('sign_settings_updated', handleSettingsUpdated);
     };
   }, []);
 

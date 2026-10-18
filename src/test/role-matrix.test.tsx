@@ -17,10 +17,10 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     const isEventManager = role === 'event_manager' || isSuperAdmin;
 
     return {
-      canManageEvents: isEventManager,
+      canManageEvents: isEventManager || isWebsiteAdmin,
       canManageLeadership: isWebsiteAdmin,
       canManageContent: isWebsiteAdmin,
-      canReviewApplications: isSuperAdmin, // Isolated to Super Admin
+      canReviewApplications: isSuperAdmin || isWebsiteAdmin, // Expanded to Website Admin & Super Admin
       canManageUserRoles: isSuperAdmin,   // Isolated to Super Admin
       canViewAuditLogs: isSuperAdmin,     // Isolated to Super Admin
     };
@@ -36,13 +36,13 @@ describe('Role-Based Access Control (RBAC) Permissions Matrix', () => {
     expect(perms.canViewAuditLogs).toBe(true);
   });
 
-  it('Website Admin can manage content and leadership but CANNOT access applications, user roles, or audit logs', () => {
+  it('Website Admin can manage events, leadership, content, and applications, but CANNOT access user roles or audit logs', () => {
     const perms = getPermissions('website_admin');
-    expect(perms.canManageEvents).toBe(false);
+    expect(perms.canManageEvents).toBe(true);
     expect(perms.canManageLeadership).toBe(true);
     expect(perms.canManageContent).toBe(true);
-    // Explicit security boundary checks:
-    expect(perms.canReviewApplications).toBe(false);
+    expect(perms.canReviewApplications).toBe(true);
+    // Explicit security boundary checks: User roles and Audit logs remain strictly Super Admin
     expect(perms.canManageUserRoles).toBe(false);
     expect(perms.canViewAuditLogs).toBe(false);
   });
