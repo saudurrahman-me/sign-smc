@@ -221,6 +221,17 @@ export const MembershipSection: React.FC = () => {
     }
   };
 
+  // Listen for cohort join button from ContactSection or other components
+  useEffect(() => {
+    const handleOpenModal = () => {
+      handleApplyClick();
+    };
+    window.addEventListener('sign-open-membership-modal', handleOpenModal);
+    return () => {
+      window.removeEventListener('sign-open-membership-modal', handleOpenModal);
+    };
+  }, [user, intakeEvaluation.isOpen, intakeEvaluation.termName]);
+
   const statusBadge = (status: string) => {
     switch (status) {
       case 'approved':
@@ -335,6 +346,10 @@ export const MembershipSection: React.FC = () => {
               <p className="text-slate-500 text-[11px]">
                 {existingApp.status === 'approved'
                   ? 'Congratulations! Your membership is active. You are officially recognized as a member.'
+                  : existingApp.status === 'withdrawn'
+                  ? 'Your application was withdrawn. You can submit a fresh membership application whenever you are ready.'
+                  : existingApp.status === 'rejected'
+                  ? 'Your application was declined for the current intake. You may re-apply with updated credentials.'
                   : 'Your application is under evaluation by the SIGN SMC Executive Review Board.'}
               </p>
 
@@ -342,7 +357,7 @@ export const MembershipSection: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsDetailsModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                 >
                   <Eye className="w-3.5 h-3.5" />
                   View Details
@@ -352,9 +367,20 @@ export const MembershipSection: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleWithdraw}
-                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors"
+                    className="px-3.5 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors cursor-pointer"
                   >
                     Withdraw Application
+                  </button>
+                )}
+
+                {(existingApp.status === 'withdrawn' || existingApp.status === 'rejected') && (
+                  <button
+                    type="button"
+                    onClick={handleApplyClick}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] to-emerald-600 hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/20 cursor-pointer"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Re-apply for Membership</span>
                   </button>
                 )}
               </div>

@@ -14,6 +14,7 @@ import {
   Mail,
   Phone,
   BookOpen,
+  UserCheck,
 } from 'lucide-react';
 
 export const MembershipStatusPage: React.FC = () => {
@@ -224,16 +225,31 @@ export const MembershipStatusPage: React.FC = () => {
 
             <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <p className="text-xs text-slate-500">
-                Need to update details? Contact the chapter secretary or advisory mentors.
+                {app.status === 'withdrawn'
+                  ? 'Your application has been withdrawn. You can re-apply anytime.'
+                  : app.status === 'rejected'
+                  ? 'Your application was declined for the current intake. You may re-apply with updated details.'
+                  : 'Need to update details? Contact the chapter secretary or advisory mentors.'}
               </p>
-              {app.status === 'pending' && (
-                <button
-                  onClick={handleWithdraw}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors"
-                >
-                  Withdraw Application
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {app.status === 'pending' && (
+                  <button
+                    onClick={handleWithdraw}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors"
+                  >
+                    Withdraw Application
+                  </button>
+                )}
+                {(app.status === 'withdrawn' || app.status === 'rejected') && (
+                  <Link
+                    to="/?openApply=true#membership"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/20"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Re-apply for Membership</span>
+                  </Link>
+                )}
+              </div>
             </div>
           </div>
         ) : (

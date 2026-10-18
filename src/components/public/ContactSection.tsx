@@ -1,12 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Phone, MapPin, MessageSquare, ExternalLink } from 'lucide-react';
+import { Mail, Phone, MapPin, MessageSquare, ArrowRight } from 'lucide-react';
 import { InstagramIcon, FacebookIcon, LinkedinIcon, YoutubeIcon } from '../brand/SocialIcons';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { SiteSettings } from '../../types/database.types';
-import { OFFICIAL_SETTINGS, OFFICIAL_MEMBERSHIP_FORM_URL } from '../../data/fallback-content';
+import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
 
 export const ContactSection: React.FC = () => {
   const [settings, setSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
+
+  const handleJoinCohort = () => {
+    const elem = document.getElementById('membership');
+    if (elem) {
+      elem.scrollIntoView({ behavior: 'smooth' });
+    }
+    window.dispatchEvent(new CustomEvent('sign-open-membership-modal'));
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -213,15 +221,14 @@ export const ContactSection: React.FC = () => {
             </div>
 
             <div className="mt-8 pt-6 border-t border-slate-100">
-              <a
-                href={settings.membership_form_url || OFFICIAL_MEMBERSHIP_FORM_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full inline-flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#015229] border border-emerald-700/40 text-center transition-all shadow-md shadow-emerald-950/20"
+              <button
+                type="button"
+                onClick={handleJoinCohort}
+                className="w-full inline-flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 border border-emerald-500/30 text-center transition-all shadow-md shadow-emerald-950/20 cursor-pointer"
               >
-                Join SIGN SMC Chapter Cohort
-                <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+                <span>Join SIGN SMC Chapter Cohort</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>

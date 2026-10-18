@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Upload,
@@ -74,6 +74,13 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setIsSuccess(false);
+      setErrorMessage(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -254,11 +261,21 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
         return;
       }
 
-      // Try full column insert first
-      let { data, error } = await supabase
+      // Check if user already has an existing application (e.g. previously withdrawn)
+      let data = null;
+      let error = null;
+
+      const { data: existingList } = await supabase
         .from('membership_applications')
-        .insert({
-          user_id: user.id,
+        .select('id, status')
+        .eq('user_id', user.id)
+        .limit(1);
+
+      const existingRecord = existingList?.[0];
+
+      if (existingRecord && (existingRecord.status === 'withdrawn' || existingRecord.status === 'rejected')) {
+        // Re-apply by updating the existing application back to pending
+        const updatePayload = {
           full_name: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
@@ -273,34 +290,132 @@ export const MembershipApplicationModal: React.FC<MembershipApplicationModalProp
           research_interests: previousExperience.trim() || null,
           agreed_to_terms: true,
           status: 'pending',
-        })
-        .select()
-        .single();
+          reviewer_notes: null,
+          reviewed_by: null,
+          reviewed_at: null,
+          updated_at: new Date().toISOString(),
+        };
 
-      // If remote Supabase table has not run the latest column additions yet, fallback safely
-      if (error && error.message?.includes('column')) {
-        const fallbackRes = await supabase
+        const updateRes = await supabase
+          .from('membership_applications')
+          .update(updatePayload)
+          .eq('id', existingRecord.id)
+          .select()
+          .single();
+
+        data = updateRes.data;
+        error = updateRes.error;
+
+        if (error && error.message?.includes('column')) {
+          const fallbackUpdate = await supabase
+            .from('membership_applications')
+            .update({
+              full_name: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              mbbs_year: `${degree} - ${yearOfStudy} (${finalCollege})`,
+              motivation: `College: ${finalCollege} | Degree: ${degree} | Year: ${yearOfStudy} | Expected Grad: ${finalGradYear} | Proof: ${finalPaymentProofUrl.slice(0, 50)}...`,
+              research_interests: previousExperience.trim() || null,
+              agreed_to_terms: true,
+              status: 'pending',
+              reviewer_notes: null,
+              reviewed_by: null,
+              reviewed_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingRecord.id)
+            .select()
+            .single();
+
+          data = fallbackUpdate.data;
+          error = fallbackUpdate.error;
+        }
+      } else {
+        // Try full column insert first
+        const insertRes = await supabase
           .from('membership_applications')
           .insert({
             user_id: user.id,
             full_name: fullName.trim(),
             email: email.trim(),
             phone: phone.trim(),
-            mbbs_year: `${degree} - ${yearOfStudy} (${finalCollege})`,
-            motivation: `College: ${finalCollege} | Degree: ${degree} | Year: ${yearOfStudy} | Expected Grad: ${finalGradYear} | Proof: ${finalPaymentProofUrl.slice(0, 50)}...`,
+            mbbs_year: `${degree} - ${yearOfStudy}`,
+            college_name: finalCollege,
+            degree: degree,
+            year_of_study: yearOfStudy,
+            expected_graduation_year: finalGradYear,
+            payment_proof_url: finalPaymentProofUrl,
+            previous_experience: previousExperience.trim() || null,
+            motivation: `College: ${finalCollege} | Degree: ${degree} | Year: ${yearOfStudy} | Expected Grad: ${finalGradYear} | Experience: ${previousExperience.trim() || 'None'}`,
             research_interests: previousExperience.trim() || null,
             agreed_to_terms: true,
             status: 'pending',
           })
           .select()
           .single();
-        data = fallbackRes.data;
-        error = fallbackRes.error;
+
+        data = insertRes.data;
+        error = insertRes.error;
+
+        // If remote Supabase table has not run the latest column additions yet, fallback safely
+        if (error && error.message?.includes('column')) {
+          const fallbackRes = await supabase
+            .from('membership_applications')
+            .insert({
+              user_id: user.id,
+              full_name: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              mbbs_year: `${degree} - ${yearOfStudy} (${finalCollege})`,
+              motivation: `College: ${finalCollege} | Degree: ${degree} | Year: ${yearOfStudy} | Expected Grad: ${finalGradYear} | Proof: ${finalPaymentProofUrl.slice(0, 50)}...`,
+              research_interests: previousExperience.trim() || null,
+              agreed_to_terms: true,
+              status: 'pending',
+            })
+            .select()
+            .single();
+          data = fallbackRes.data;
+          error = fallbackRes.error;
+        }
+
+        // If insert failed due to duplicate key, attempt re-apply update
+        if (error && error.code === '23505') {
+          const retryUpdate = await supabase
+            .from('membership_applications')
+            .update({
+              full_name: fullName.trim(),
+              email: email.trim(),
+              phone: phone.trim(),
+              mbbs_year: `${degree} - ${yearOfStudy}`,
+              college_name: finalCollege,
+              degree: degree,
+              year_of_study: yearOfStudy,
+              expected_graduation_year: finalGradYear,
+              payment_proof_url: finalPaymentProofUrl,
+              previous_experience: previousExperience.trim() || null,
+              motivation: `College: ${finalCollege} | Degree: ${degree} | Year: ${yearOfStudy} | Expected Grad: ${finalGradYear} | Experience: ${previousExperience.trim() || 'None'}`,
+              research_interests: previousExperience.trim() || null,
+              agreed_to_terms: true,
+              status: 'pending',
+              reviewer_notes: null,
+              reviewed_by: null,
+              reviewed_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', user.id)
+            .select()
+            .single();
+
+          if (!retryUpdate.error && retryUpdate.data) {
+            data = retryUpdate.data;
+            error = null;
+          }
+        }
       }
 
       if (error) {
         if (error.code === '23505') {
-          throw new Error('You have already submitted a membership application. Admin review is in progress.');
+          throw new Error('You already have an active membership application under review.');
         }
         throw error;
       }
