@@ -156,4 +156,46 @@ describe('Event Registration System', () => {
       expect(screen.getByPlaceholderText(/student@example\.com/i)).toBeInTheDocument();
     });
   });
+
+  it('transforms Register button into "Registered • View Details" when attendee is already registered', async () => {
+    // Pre-populate with existing registration for mockEvent
+    const myReg = {
+      id: 'reg-me-1',
+      event_id: mockEvent.id,
+      full_name: 'Dr. Registered Student',
+      email: 'student.registered@smc.edu.pk',
+      phone: '0333-7778899',
+      college_name: 'Saidu Medical College, Swat',
+      mbbs_year: 'MBBS - 4th Year',
+      student_id: 'SMC-401',
+      questions_or_notes: 'Excited for stroke localization seminar',
+      attendance_status: 'registered',
+      registration_code: 'SMC-REG-ALREADY-THERE',
+      created_at: new Date().toISOString(),
+    };
+    localStorage.setItem('sign_event_registrations', JSON.stringify([myReg]));
+    sessionStorage.setItem('sign_dev_events', JSON.stringify([mockEvent]));
+
+    render(<EventsSection />);
+
+    await waitFor(() => {
+      expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+    });
+
+    // Instead of Register button, it should show Registered & View Details
+    expect(screen.queryByRole('button', { name: /^Register$/i })).not.toBeInTheDocument();
+    const registeredBtn = screen.getByRole('button', { name: /Registered.*View Details/i });
+    expect(registeredBtn).toBeInTheDocument();
+
+    // Clicking View Details opens the modal in Confirmed Pass view with reference code & details
+    fireEvent.click(registeredBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Your Event Registration/i)).toBeInTheDocument();
+      expect(screen.getByText('SMC-REG-ALREADY-THERE')).toBeInTheDocument();
+      expect(screen.getByText('student.registered@smc.edu.pk')).toBeInTheDocument();
+      expect(screen.getByText('0333-7778899')).toBeInTheDocument();
+      expect(screen.getByText(/Excited for stroke localization seminar/i)).toBeInTheDocument();
+    });
+  });
 });

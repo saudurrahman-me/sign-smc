@@ -1,15 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { EventItem, EventCategory } from '../../types/database.types';
+import { useOptionalAuth } from '../../context/AuthContext';
+import type { EventItem, EventCategory, EventRegistration } from '../../types/database.types';
 import { EventRegistrationModal } from './EventRegistrationModal';
 
 export const EventsSection: React.FC = () => {
+  const auth = useOptionalAuth();
+  const user = auth?.user || null;
+
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
   const [selectedEventForReg, setSelectedEventForReg] = useState<EventItem | null>(null);
+  const [selectedRegistration, setSelectedRegistration] = useState<EventRegistration | null>(null);
+  const [userRegistrations, setUserRegistrations] = useState<Record<string, EventRegistration>>({});
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
 
   const categories: Array<'All' | EventCategory> = [
@@ -68,6 +74,57 @@ export const EventsSection: React.FC = () => {
       isMounted = false;
     };
   }, []);
+
+  const loadUserRegistrations = useCallback(async () => {
+    const regMap: Record<string, EventRegistration> = {};
+
+    // 1. Read from local storage (for current visitor/device)
+    try {
+      const stored = localStorage.getItem('sign_event_registrations');
+      if (stored) {
+        const parsed: EventRegistration[] = JSON.parse(stored);
+        parsed.forEach((r) => {
+          if (r.attendance_status !== 'cancelled' && r.event_id) {
+            regMap[r.event_id] = r;
+          }
+        });
+      }
+    } catch {
+      // ignore
+    }
+
+    // 2. Read from Supabase if authenticated user is present
+    if (isSupabaseConfigured && (user?.id || user?.email)) {
+      try {
+        const email = user.email?.trim().toLowerCase();
+        let query = supabase.from('event_registrations').select('*');
+        if (user.id && email) {
+          query = query.or(`user_id.eq.${user.id},email.eq.${email}`);
+        } else if (user.id) {
+          query = query.eq('user_id', user.id);
+        } else if (email) {
+          query = query.eq('email', email);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+          data.forEach((r: EventRegistration) => {
+            if (r.attendance_status !== 'cancelled' && r.event_id) {
+              regMap[r.event_id] = r;
+            }
+          });
+        }
+      } catch {
+        // Table may not exist yet or offline
+      }
+    }
+
+    setUserRegistrations(regMap);
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    loadUserRegistrations();
+  }, [loadUserRegistrations]);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -209,16 +266,34 @@ export const EventsSection: React.FC = () => {
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-[170px]">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-[150px]">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                       <span className="truncate">{ev.venue}</span>
                     </div>
 
-                    {ev.event_date >= todayStr ? (
+                    {userRegistrations[ev.id] ? (
                       <button
                         type="button"
                         onClick={() => {
                           setSelectedEventForReg(ev);
+                          setSelectedRegistration(userRegistrations[ev.id]);
+                          setIsRegModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 transition-all group/btn cursor-pointer shadow-xs"
+                        title="You are registered for this event! Click to view your attendee pass and details."
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Registered</span>
+                        <span className="text-[10px] bg-[#016533] text-white px-1.5 py-0.5 rounded-md ml-0.5 group-hover/btn:bg-[#015229] transition-colors">
+                          View Details
+                        </span>
+                      </button>
+                    ) : ev.event_date >= todayStr ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEventForReg(ev);
+                          setSelectedRegistration(null);
                           setIsRegModalOpen(true);
                         }}
                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#015229] shadow-xs hover:shadow transition-all group/btn cursor-pointer"
@@ -273,8 +348,17 @@ export const EventsSection: React.FC = () => {
           onClose={() => {
             setIsRegModalOpen(false);
             setSelectedEventForReg(null);
+            setSelectedRegistration(null);
           }}
           event={selectedEventForReg}
+          existingRegistration={selectedRegistration}
+          onRegistrationSuccess={(newReg) => {
+            setUserRegistrations((prev) => ({
+              ...prev,
+              [newReg.event_id]: newReg,
+            }));
+            setSelectedRegistration(newReg);
+          }}
         />
       )}
     </section>

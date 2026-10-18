@@ -21,6 +21,7 @@ interface EventRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
   event: EventItem | null;
+  existingRegistration?: EventRegistration | null;
   onRegistrationSuccess?: (reg: EventRegistration) => void;
 }
 
@@ -28,6 +29,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   isOpen,
   onClose,
   event,
+  existingRegistration = null,
   onRegistrationSuccess,
 }) => {
   const auth = useOptionalAuth();
@@ -57,14 +59,14 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
     }
   }, [profile, user]);
 
-  // Reset form when modal opens with a new event
+  // Reset or initialize form when modal opens
   useEffect(() => {
     if (isOpen) {
-      setConfirmedReg(null);
+      setConfirmedReg(existingRegistration || null);
       setErrorMessage(null);
       setCopiedCode(false);
     }
-  }, [isOpen, event?.id]);
+  }, [isOpen, event?.id, existingRegistration]);
 
   if (!isOpen || !event) return null;
 
@@ -200,7 +202,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 mb-1.5">
               <Ticket className="w-3 h-3 text-emerald-400" />
-              <span>Event Registration</span>
+              <span>{confirmedReg ? 'Attendee Pass & Details' : 'Event Registration'}</span>
             </div>
             <h3 className="text-base sm:text-lg font-bold text-white line-clamp-2 leading-snug">
               {event.title}
@@ -226,9 +228,13 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
               </div>
 
               <div>
-                <h4 className="text-xl font-black text-white">Registration Confirmed!</h4>
+                <h4 className="text-xl font-black text-white">
+                  {existingRegistration ? 'Your Event Registration' : 'Registration Confirmed!'}
+                </h4>
                 <p className="text-slate-400 text-xs mt-1">
-                  You are officially registered for this academic session.
+                  {existingRegistration
+                    ? 'You are registered for this session. Here are your attendee pass and session details.'
+                    : 'You are officially registered for this academic session.'}
                 </p>
               </div>
 
@@ -294,6 +300,52 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                     </button>
                   </div>
                 </div>
+              </div>
+
+              {/* Detailed Registration Breakdown */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-left space-y-2.5 shadow-sm">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Your Registration Info
+                  </span>
+                  <span className="text-[10px] text-emerald-400 font-semibold px-2 py-0.5 rounded bg-emerald-950 border border-emerald-800/60">
+                    Status: {confirmedReg.attendance_status === 'attended' ? 'Attended' : 'Registered'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-[11px]">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Email Address</span>
+                    <span className="text-slate-200 font-medium truncate block">{confirmedReg.email}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">WhatsApp / Phone</span>
+                    <span className="text-slate-200 font-medium">{confirmedReg.phone}</span>
+                  </div>
+                  {confirmedReg.student_id && (
+                    <div>
+                      <span className="text-slate-500 block text-[10px]">College Roll No / Student ID</span>
+                      <span className="text-slate-200 font-medium">{confirmedReg.student_id}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">Registered On</span>
+                    <span className="text-slate-200 font-medium">
+                      {new Date(confirmedReg.created_at).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {confirmedReg.questions_or_notes && (
+                  <div className="pt-2 border-t border-slate-800/60 text-[11px]">
+                    <span className="text-slate-500 block text-[10px]">Submitted Questions / Topics:</span>
+                    <p className="text-slate-300 italic mt-0.5">"{confirmedReg.questions_or_notes}"</p>
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons */}
