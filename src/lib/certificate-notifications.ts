@@ -153,19 +153,27 @@ export async function sendCertificateEmailNotification(
       }),
     });
 
-    if (apiResponse.ok) {
-      const data = await apiResponse.json();
-      if (data?.success) {
-        return {
-          success: true,
-          channel: 'edge_function',
-          message: `Official certificate email automatically sent to ${params.studentEmail} via Resend.`,
-          mailtoUrl: content.mailtoUrl,
-        };
-      }
+    const data = await apiResponse.json().catch(() => ({}));
+
+    if (apiResponse.ok && data?.success) {
+      return {
+        success: true,
+        channel: 'edge_function',
+        message: `Official certificate email automatically sent to ${params.studentEmail} via Resend.`,
+        mailtoUrl: content.mailtoUrl,
+      };
+    } else {
+      const errText = data?.error || data?.message || 'Resend API call unsuccessful';
+      console.warn('[Resend API notice]:', errText);
+      return {
+        success: false,
+        channel: 'client_fallback',
+        message: `Resend error: ${errText}`,
+        mailtoUrl: content.mailtoUrl,
+      };
     }
-  } catch {
-    // Fall through to Supabase or Webhook
+  } catch (err) {
+    console.warn('[Resend dispatch error]:', err);
   }
 
   // 2. Try Supabase Edge Function if connected

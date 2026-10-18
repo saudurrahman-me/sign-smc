@@ -277,16 +277,21 @@ export const AdminCertificatesPage: React.FC = () => {
         prev.map((c) => (c.id === selectedCert.id ? updatedRecord : c))
       );
 
-      setActionSuccessMsg(
-        isApproved
-          ? `Certificate approved and issued! Notification dispatched to ${selectedCert.student_email}.`
-          : `Request marked as declined. Notice dispatched to ${selectedCert.student_email}.`
-      );
-
-      setTimeout(() => {
-        setIsReviewModalOpen(false);
-        setActionSuccessMsg(null);
-      }, 1500);
+      if (emailResult.success) {
+        setActionSuccessMsg(
+          isApproved
+            ? `Certificate approved! Email successfully dispatched to ${selectedCert.student_email} via Resend.`
+            : `Request declined. Notice dispatched to ${selectedCert.student_email} via Resend.`
+        );
+        setTimeout(() => {
+          setIsReviewModalOpen(false);
+          setActionSuccessMsg(null);
+        }, 1800);
+      } else {
+        setActionErrorMsg(
+          `Certificate updated, but Resend notice: ${emailResult.message}`
+        );
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update certificate request.';
       setActionErrorMsg(msg);
