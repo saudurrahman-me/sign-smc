@@ -57,7 +57,6 @@ export const AdminContentSettingsPage: React.FC = () => {
   const [facebook, setFacebook] = useState(OFFICIAL_SETTINGS.social_links?.facebook || '');
   const [linkedin, setLinkedin] = useState(OFFICIAL_SETTINGS.social_links?.linkedin || '');
   const [youtube, setYoutube] = useState(OFFICIAL_SETTINGS.social_links?.youtube || '');
-  const [membershipFormUrl, setMembershipFormUrl] = useState(OFFICIAL_SETTINGS.membership_form_url || '');
 
   // Academic Semester Membership Intake Controls
   const [membershipOpen, setMembershipOpen] = useState(OFFICIAL_SETTINGS.membership_open ?? true);
@@ -114,7 +113,6 @@ export const AdminContentSettingsPage: React.FC = () => {
           setFacebook(setts.social_links?.facebook || '');
           setLinkedin(setts.social_links?.linkedin || '');
           setYoutube(setts.social_links?.youtube || '');
-          setMembershipFormUrl(setts.membership_form_url || '');
           setMembershipOpen(setts.membership_open ?? true);
           if (setts.membership_term_name) setMembershipTermName(setts.membership_term_name);
           if (setts.membership_start_date) setMembershipStartDate(setts.membership_start_date);
@@ -257,7 +255,7 @@ export const AdminContentSettingsPage: React.FC = () => {
       membership_start_date: membershipStartDate || null,
       membership_end_date: membershipEndDate || null,
       membership_closed_message: membershipClosedMessage.trim() || null,
-      membership_form_url: membershipFormUrl.trim() || null,
+      membership_form_url: null,
       updated_at: new Date().toISOString(),
       updated_by: user?.id,
     };
@@ -299,7 +297,7 @@ export const AdminContentSettingsPage: React.FC = () => {
               youtube: youtube.trim(),
             },
             membership_open: membershipOpen,
-            membership_form_url: membershipFormUrl.trim() || null,
+            membership_form_url: null,
             updated_at: new Date().toISOString(),
             updated_by: user?.id,
           })
@@ -486,17 +484,9 @@ export const AdminContentSettingsPage: React.FC = () => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-slate-300 font-semibold mb-1">
-              Official Membership Application URL (Google Forms)
-            </label>
-            <input
-              type="url"
-              value={membershipFormUrl}
-              onChange={(e) => setMembershipFormUrl(e.target.value)}
-              placeholder="https://forms.gle/jzUr115noQ1fDNdS8"
-              className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-cyan-500"
-            />
+          <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2.5 text-xs text-emerald-300">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>Membership applications are processed natively through the built-in website enrollment form.</span>
           </div>
 
           <div>

@@ -79,7 +79,7 @@ export const AdminEventsPage: React.FC = () => {
       is_virtual: false,
       organizer: 'SIGN SMC Chapter',
       cover_image_url: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&q=80&w=800',
-      registration_url: 'https://forms.gle/jzUr115noQ1fDNdS8',
+      registration_url: null,
       is_published: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -97,7 +97,7 @@ export const AdminEventsPage: React.FC = () => {
       is_virtual: false,
       organizer: 'SIGN Academic Board',
       cover_image_url: 'https://images.unsplash.com/photo-1559757175-5700dde675bc?auto=format&fit=crop&q=80&w=800',
-      registration_url: 'https://forms.gle/jzUr115noQ1fDNdS8',
+      registration_url: null,
       is_published: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -860,7 +860,7 @@ export const AdminEventsPage: React.FC = () => {
                   type="url"
                   value={registrationUrl}
                   onChange={(e) => setRegistrationUrl(e.target.value)}
-                  placeholder="https://forms.gle/... or meeting link"
+                  placeholder="https://zoom.us/j/... or session link"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
                 />
               </div>
