@@ -643,4 +643,43 @@ describe('Event Registration System', () => {
     expect(screen.getByRole('button', { name: /Confirm Registration/i })).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Dr\. Muhammad Ahmad/i)).toBeInTheDocument();
   });
+
+  it('renders custom admin-configured slots, instructions, phone numbers, and emails', () => {
+    const customAdminConfiguredEvent: EventItem = {
+      ...mockPaidEvent,
+      id: 'custom-evt-admin-1',
+      title: 'Neuro-Intervention Masterclass',
+      max_attendees: 35,
+      support_phone: '0345-9876543 (Dr. Amjad Iqbal)',
+      support_email: 'neurology.desk@smc.edu.pk',
+      support_instructions:
+        'Custom Admin Instruction: If debit fails on JazzCash/Easypaisa, immediately ping Dr. Amjad.',
+    };
+
+    render(
+      <EventRegistrationModal
+        isOpen={true}
+        onClose={() => {}}
+        event={customAdminConfiguredEvent}
+      />
+    );
+
+    // Slots
+    expect(screen.getByText(/35 \/ 35 Slots Left/i)).toBeInTheDocument();
+
+    // Support phone & WhatsApp link
+    expect(screen.getByText(/0345-9876543 \(Dr\. Amjad Iqbal\)/i)).toBeInTheDocument();
+    const waLink = screen.getByText(/0345-9876543 \(Dr\. Amjad Iqbal\)/i).closest('a');
+    expect(waLink).toHaveAttribute('href', 'https://wa.me/923459876543');
+
+    // Support email
+    expect(screen.getByText('neurology.desk@smc.edu.pk')).toBeInTheDocument();
+    const emailLink = screen.getByText('neurology.desk@smc.edu.pk').closest('a');
+    expect(emailLink).toHaveAttribute('href', 'mailto:neurology.desk@smc.edu.pk');
+
+    // Custom instructions
+    expect(
+      screen.getByText(/Custom Admin Instruction: If debit fails on JazzCash\/Easypaisa, immediately ping Dr\. Amjad\./i)
+    ).toBeInTheDocument();
+  });
 });

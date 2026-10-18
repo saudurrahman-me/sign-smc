@@ -99,7 +99,7 @@ export interface EventItem {
   created_at: string;
   updated_at: string;
 
-  // Pricing & Payment Settings
+  // Pricing, Payment & Support Settings
   is_paid?: boolean;
   registration_fee?: number;
   payment_instructions?: string | null;
@@ -108,6 +108,10 @@ export interface EventItem {
   account_number?: string | null;
   ambassador_code?: string | null;
   ambassador_discount_percent?: number | null;
+  max_attendees?: number | null;
+  support_phone?: string | null;
+  support_email?: string | null;
+  support_instructions?: string | null;
 }
 
 export interface MembershipApplication {

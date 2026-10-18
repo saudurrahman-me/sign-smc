@@ -90,6 +90,12 @@ export const AdminEventsPage: React.FC = () => {
   const [accountNumber, setAccountNumber] = useState('03179752692');
   const [ambassadorCode, setAmbassadorCode] = useState('AMBASSADOR');
   const [ambassadorDiscountPercent, setAmbassadorDiscountPercent] = useState<number | string>(20);
+  const [maxAttendees, setMaxAttendees] = useState<number | string>('');
+  const [supportPhone, setSupportPhone] = useState('0317-9752692 (Waqar Younas)');
+  const [supportEmail, setSupportEmail] = useState('signsmc.official@gmail.com');
+  const [supportInstructions, setSupportInstructions] = useState(
+    'If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:'
+  );
 
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [isPublished, setIsPublished] = useState(false);
@@ -518,6 +524,12 @@ export const AdminEventsPage: React.FC = () => {
     setAccountNumber('03179752692');
     setAmbassadorCode('AMBASSADOR');
     setAmbassadorDiscountPercent(20);
+    setMaxAttendees('');
+    setSupportPhone('0317-9752692 (Waqar Younas)');
+    setSupportEmail('signsmc.official@gmail.com');
+    setSupportInstructions(
+      'If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:'
+    );
 
     setFormError(null);
     setIsModalOpen(true);
@@ -540,7 +552,7 @@ export const AdminEventsPage: React.FC = () => {
     setRegistrationUrl(ev.registration_url || '');
     setIsPublished(ev.is_published);
 
-    // Initialize payment fields
+    // Initialize payment & support fields
     setIsPaid(Boolean(ev.is_paid));
     setRegistrationFee(ev.registration_fee ?? 500);
     setPaymentInstructions(ev.payment_instructions || '');
@@ -549,6 +561,13 @@ export const AdminEventsPage: React.FC = () => {
     setAccountNumber(ev.account_number || '03179752692');
     setAmbassadorCode(ev.ambassador_code || 'AMBASSADOR');
     setAmbassadorDiscountPercent(ev.ambassador_discount_percent ?? 20);
+    setMaxAttendees(ev.max_attendees ? String(ev.max_attendees) : '');
+    setSupportPhone(ev.support_phone ?? '0317-9752692 (Waqar Younas)');
+    setSupportEmail(ev.support_email ?? 'signsmc.official@gmail.com');
+    setSupportInstructions(
+      ev.support_instructions ??
+        'If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:'
+    );
 
     setFormError(null);
     setIsModalOpen(true);
@@ -643,7 +662,7 @@ export const AdminEventsPage: React.FC = () => {
         is_published: isPublished,
         updated_at: new Date().toISOString(),
 
-        // Pricing & Payment Settings
+        // Pricing, Payment & Support Settings
         is_paid: isPaid,
         registration_fee: isPaid ? Number(registrationFee) || 0 : 0,
         payment_instructions: isPaid ? paymentInstructions.trim() || null : null,
@@ -652,6 +671,10 @@ export const AdminEventsPage: React.FC = () => {
         account_number: isPaid ? accountNumber.trim() || '03179752692' : null,
         ambassador_code: isPaid ? ambassadorCode.trim().toUpperCase() || 'AMBASSADOR' : null,
         ambassador_discount_percent: isPaid ? Number(ambassadorDiscountPercent) || 0 : 0,
+        max_attendees: maxAttendees !== '' && Number(maxAttendees) > 0 ? Number(maxAttendees) : null,
+        support_phone: supportPhone.trim() || null,
+        support_email: supportEmail.trim() || null,
+        support_instructions: supportInstructions.trim() || null,
       };
 
       const basicPayload = {
@@ -667,6 +690,7 @@ export const AdminEventsPage: React.FC = () => {
         cover_image_url: coverImageUrl.trim() || null,
         registration_url: registrationUrl.trim() || null,
         is_published: isPublished,
+        max_attendees: maxAttendees !== '' && Number(maxAttendees) > 0 ? Number(maxAttendees) : null,
         updated_at: new Date().toISOString(),
       };
 
@@ -686,7 +710,11 @@ export const AdminEventsPage: React.FC = () => {
           message.includes('registration_fee') ||
           message.includes('bank_name') ||
           message.includes('ambassador') ||
-          message.includes('payment_instructions')
+          message.includes('payment_instructions') ||
+          message.includes('max_attendees') ||
+          message.includes('support_phone') ||
+          message.includes('support_email') ||
+          message.includes('support_instructions')
         );
       };
 
@@ -1006,8 +1034,13 @@ export const AdminEventsPage: React.FC = () => {
                         title="View & manage registered attendees for this event"
                       >
                         <Users className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:scale-110 transition-transform" />
-                        <span>{attendeeCounts[ev.id] || 0}</span>
-                        <span className="text-[11px] text-emerald-400/80">Registered</span>
+                        <span>
+                          {attendeeCounts[ev.id] || 0}
+                          {ev.max_attendees ? ` / ${ev.max_attendees}` : ''}
+                        </span>
+                        <span className="text-[11px] text-emerald-400/80">
+                          {ev.max_attendees ? 'Slots' : 'Registered'}
+                        </span>
                       </button>
                     </td>
                     <td className="py-4 px-4 text-center whitespace-nowrap">
@@ -1195,19 +1228,39 @@ export const AdminEventsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Venue */}
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">
-                  Venue / Location <span className="text-rose-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={venue}
-                  onChange={(e) => setVenue(e.target.value)}
-                  placeholder="e.g. Saidu Medical College Auditorium / SGTH Neurology Dept"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
-                />
+              {/* Venue & Attendee Slots */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-slate-300 font-semibold mb-1">
+                    Venue / Location <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={venue}
+                    onChange={(e) => setVenue(e.target.value)}
+                    placeholder="e.g. Saidu Medical College Auditorium / SGTH Neurology Dept"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-cyan-400" />
+                      Attendee Slots
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-normal">Optional</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={maxAttendees}
+                    onChange={(e) => setMaxAttendees(e.target.value)}
+                    placeholder="e.g. 50 (0 = unlimited)"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500 font-mono"
+                  />
+                </div>
               </div>
 
               {/* Cover Image Upload & Optimization */}
@@ -1476,6 +1529,58 @@ export const AdminEventsPage: React.FC = () => {
                         placeholder="e.g. Please transfer fee and upload screenshot with Transaction ID clearly visible."
                         className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:border-teal-500"
                       />
+                    </div>
+
+                    {/* Support Contact & Helpline Settings */}
+                    <div className="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+                      <div className="text-slate-300 font-semibold text-[11px] flex items-center gap-1.5 text-amber-300">
+                        <Phone className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Transaction Support & Helpline Contacts</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-slate-400 font-medium mb-1 text-[10.5px]">
+                            Support WhatsApp / Contact Number
+                          </label>
+                          <input
+                            type="text"
+                            value={supportPhone}
+                            onChange={(e) => setSupportPhone(e.target.value)}
+                            placeholder="e.g. 0317-9752692 (Waqar Younas)"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500 font-mono"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-slate-400 font-medium mb-1 text-[10.5px]">
+                            Support Official Email
+                          </label>
+                          <input
+                            type="email"
+                            value={supportEmail}
+                            onChange={(e) => setSupportEmail(e.target.value)}
+                            placeholder="e.g. signsmc.official@gmail.com"
+                            className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-400 font-medium mb-1 text-[10.5px]">
+                          Transaction Error Guidance Notice
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={supportInstructions}
+                          onChange={(e) => setSupportInstructions(e.target.value)}
+                          placeholder="e.g. If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:"
+                          className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          This notice is displayed to attendees inside the payment section during registration.
+                        </span>
+                      </div>
                     </div>
                   </div>
                 )}

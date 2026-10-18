@@ -29,6 +29,7 @@ import {
   FileCheck,
   MessageCircle,
   Mail,
+  Users,
 } from 'lucide-react';
 
 interface EventRegistrationModalProps {
@@ -124,10 +125,58 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const finalFee = Math.max(0, originalFee - discountAmount);
   const isFeeWaived = isPaidEvent && finalFee === 0;
 
-  // Account details
+  // Account details (admin configurable)
   const bankName = event.bank_name || 'Easypaisa';
   const accountTitle = event.account_title || 'Waqar Younas';
   const accountNumber = event.account_number || '03179752692';
+
+  // Support & Helpline details (admin configurable)
+  const supportPhone = event.support_phone || '0317-9752692 (Waqar Younas)';
+  const supportEmail = event.support_email || 'signsmc.official@gmail.com';
+  const supportInstructions =
+    event.support_instructions ||
+    'If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:';
+
+  // Dynamic WhatsApp link from support phone
+  const cleanPhoneDigits = supportPhone.replace(/[^0-9]/g, '');
+  const whatsAppUrl = cleanPhoneDigits
+    ? cleanPhoneDigits.startsWith('0')
+      ? `https://wa.me/92${cleanPhoneDigits.slice(1)}`
+      : cleanPhoneDigits.startsWith('92')
+      ? `https://wa.me/${cleanPhoneDigits}`
+      : `https://wa.me/${cleanPhoneDigits}`
+    : 'https://wa.me/923179752692';
+
+  // Slots & Capacity (admin configurable)
+  const maxSlots = event.max_attendees ? Number(event.max_attendees) : null;
+  const [totalRegistered, setTotalRegistered] = useState<number>(0);
+
+  useEffect(() => {
+    if (!event?.id) return;
+    try {
+      const stored = localStorage.getItem('sign_event_registrations');
+      const existing: EventRegistration[] = stored ? JSON.parse(stored) : [];
+      const count = existing.filter((r) => r.event_id === event.id).length;
+      setTotalRegistered(count);
+    } catch {
+      // ignore
+    }
+
+    if (isSupabaseConfigured) {
+      supabase
+        .from('event_registrations')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_id', event.id)
+        .then(({ count }) => {
+          if (typeof count === 'number') {
+            setTotalRegistered(count);
+          }
+        });
+    }
+  }, [event?.id, isOpen]);
+
+  const isSlotsFull = Boolean(maxSlots && totalRegistered >= maxSlots);
+  const remainingSlots = maxSlots ? Math.max(0, maxSlots - totalRegistered) : null;
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -237,6 +286,13 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (isSlotsFull) {
+      setErrorMessage(
+        `Registration is closed as all ${maxSlots} slots for this event have been filled.`
+      );
+      return;
+    }
 
     if (!fullName.trim() || !email.trim() || !phone.trim()) {
       setErrorMessage('Please fill in your Name, Email, and WhatsApp contact number.');
@@ -679,18 +735,33 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                     )}
                   </div>
 
-                  {/* Pricing Tag */}
-                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
-                    {isPaidEvent ? (
-                      <span className="text-amber-300 bg-amber-950/60 border border-amber-600/40 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
-                        <CreditCard className="w-3 h-3" />
-                        PKR {event.registration_fee}
-                      </span>
-                    ) : (
-                      <span className="text-emerald-300 bg-emerald-950/60 border border-emerald-600/40 px-2 py-0.5 rounded-md flex items-center gap-1">
-                        Free Registration
+                  {/* Pricing & Slots Tags */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {maxSlots !== null && maxSlots > 0 && (
+                      <span className="text-cyan-300 bg-cyan-950/70 border border-cyan-500/40 px-2.5 py-0.5 rounded-md inline-flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                        <Users className="w-3 h-3 text-cyan-400" />
+                        <span>
+                          {isSlotsFull ? (
+                            <span className="text-rose-400 font-semibold">0 / {maxSlots} Slots Left</span>
+                          ) : (
+                            <span>{remainingSlots} / {maxSlots} Slots Left</span>
+                          )}
+                        </span>
                       </span>
                     )}
+
+                    <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold">
+                      {isPaidEvent ? (
+                        <span className="text-amber-300 bg-amber-950/60 border border-amber-600/40 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                          <CreditCard className="w-3 h-3" />
+                          PKR {event.registration_fee}
+                        </span>
+                      ) : (
+                        <span className="text-emerald-300 bg-emerald-950/60 border border-emerald-600/40 px-2 py-0.5 rounded-md flex items-center gap-1">
+                          Free Registration
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -703,6 +774,19 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                   <span className="truncate">{event.venue}</span>
                 </div>
               </div>
+
+              {/* Slots Full Notice */}
+              {isSlotsFull && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs flex items-center gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <strong className="block text-white font-semibold">Registration Capacity Reached</strong>
+                    <span className="text-[11px] text-amber-300/90">
+                      All {maxSlots} attendee slots for this event have been filled. Registrations are currently closed.
+                    </span>
+                  </div>
+                </div>
+              )}
 
               {errorMessage && (
                 <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2 animate-in fade-in duration-200">
@@ -975,32 +1059,36 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                         </p>
                       </div>
 
-                      {/* Transaction Support / Issue Instructions */}
+                      {/* Transaction Support / Issue Instructions (Configurable by admin) */}
                       <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200/90 text-xs space-y-2">
                         <div className="flex items-center gap-2 font-bold text-amber-300">
                           <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
                           <span>Encountering a Transaction Error or Payment Issue?</span>
                         </div>
-                        <p className="text-[11px] text-slate-300 leading-relaxed">
-                          If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:
+                        <p className="text-[11px] text-slate-300 leading-relaxed whitespace-pre-line">
+                          {supportInstructions}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px]">
-                          <a
-                            href="https://wa.me/923179752692"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-emerald-300 hover:text-emerald-200 font-semibold transition-colors bg-emerald-950/70 hover:bg-emerald-900/80 px-2.5 py-1.5 rounded-lg border border-emerald-700/50"
-                          >
-                            <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>WhatsApp: 0317-9752692 (Waqar Younas)</span>
-                          </a>
-                          <a
-                            href="mailto:signsmc.official@gmail.com"
-                            className="inline-flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold transition-colors bg-teal-950/70 hover:bg-teal-900/80 px-2.5 py-1.5 rounded-lg border border-teal-700/50"
-                          >
-                            <Mail className="w-3.5 h-3.5 text-teal-400" />
-                            <span>signsmc.official@gmail.com</span>
-                          </a>
+                          {supportPhone && (
+                            <a
+                              href={whatsAppUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 text-emerald-300 hover:text-emerald-200 font-semibold transition-colors bg-emerald-950/70 hover:bg-emerald-900/80 px-2.5 py-1.5 rounded-lg border border-emerald-700/50"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>WhatsApp: {supportPhone}</span>
+                            </a>
+                          )}
+                          {supportEmail && (
+                            <a
+                              href={`mailto:${supportEmail}`}
+                              className="inline-flex items-center gap-1.5 text-teal-300 hover:text-teal-200 font-semibold transition-colors bg-teal-950/70 hover:bg-teal-900/80 px-2.5 py-1.5 rounded-lg border border-teal-700/50"
+                            >
+                              <Mail className="w-3.5 h-3.5 text-teal-400" />
+                              <span>{supportEmail}</span>
+                            </a>
+                          )}
                         </div>
                       </div>
 
@@ -1126,13 +1214,18 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer shadow-md shadow-emerald-950/40 disabled:opacity-50"
+                  disabled={isSubmitting || isSlotsFull}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer shadow-md shadow-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       <span>Confirming...</span>
+                    </>
+                  ) : isSlotsFull ? (
+                    <>
+                      <Users className="w-4 h-4" />
+                      <span>Slots Full (Closed)</span>
                     </>
                   ) : (
                     <>

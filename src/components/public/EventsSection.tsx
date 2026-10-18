@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight, CheckCircle2, CreditCard } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight, CheckCircle2, CreditCard, Users } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useOptionalAuth } from '../../context/AuthContext';
 import type { EventItem, EventCategory, EventRegistration } from '../../types/database.types';
@@ -261,6 +261,13 @@ export const EventsSection: React.FC = () => {
                         Free
                       </span>
                     )}
+
+                    {ev.max_attendees && ev.max_attendees > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-cyan-950/80 backdrop-blur-md text-cyan-300 border border-cyan-500/40 font-mono shadow-xs">
+                        <Users className="w-3 h-3 text-cyan-400" />
+                        {ev.max_attendees} Slots
+                      </span>
+                    ) : null}
                   </div>
 
                   {ev.is_virtual && (
