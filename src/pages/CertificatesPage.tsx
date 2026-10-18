@@ -227,13 +227,75 @@ export const CertificatesPage: React.FC = () => {
         ...userLocalCerts.filter((l) => !remoteCerts.some((r) => r.id === l.id)),
       ];
 
-      setCertificates(merged);
+      // Sanitize any dead blob: or legacy 404 github URLs
+      const sanitized = merged.map((c) => ({
+        ...c,
+        certificate_file_url:
+          c.certificate_file_url?.startsWith('blob:') ||
+          (c.certificate_file_url?.includes('raw.githubusercontent.com') &&
+            c.certificate_file_url?.includes('sample-certificate.pdf'))
+            ? '/sample-certificate.pdf'
+            : c.certificate_file_url || '/sample-certificate.pdf',
+      }));
+
+      setCertificates(sanitized);
     } catch (err) {
       console.warn('[SIGN Certificates] User certificates query notice:', err);
-      // Strictly show only this user's local requests, never mock demo certificates
-      setCertificates(userLocalCerts);
+      // Strictly show only this user's local requests, sanitized
+      const sanitized = userLocalCerts.map((c) => ({
+        ...c,
+        certificate_file_url:
+          c.certificate_file_url?.startsWith('blob:') ||
+          (c.certificate_file_url?.includes('raw.githubusercontent.com') &&
+            c.certificate_file_url?.includes('sample-certificate.pdf'))
+            ? '/sample-certificate.pdf'
+            : c.certificate_file_url || '/sample-certificate.pdf',
+      }));
+      setCertificates(sanitized);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Safe certificate downloader that handles Base64 data URLs, Blobs, and Public PDFs
+  const handleDownloadCertificate = async (cert: EventCertificate) => {
+    const fileUrl =
+      cert.certificate_file_url?.startsWith('blob:') ||
+      (cert.certificate_file_url?.includes('raw.githubusercontent.com') &&
+        cert.certificate_file_url?.includes('sample-certificate.pdf'))
+        ? '/sample-certificate.pdf'
+        : cert.certificate_file_url || '/sample-certificate.pdf';
+
+    const fileName = cert.certificate_code
+      ? `${cert.certificate_code}.pdf`
+      : 'SIGN_Certificate.pdf';
+
+    // 1. Base64 Data URL (e.g. data:application/pdf;base64,...)
+    if (fileUrl.startsWith('data:')) {
+      const link = document.createElement('a');
+      link.href = fileUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return;
+    }
+
+    // 2. Fetch binary blob to guarantee a clean, uncorrupted PDF download
+    try {
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error('File download failed');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      window.open(fileUrl, '_blank');
     }
   };
 
@@ -607,16 +669,14 @@ export const CertificatesPage: React.FC = () => {
                       {/* Action buttons */}
                       {isApproved && (
                         <div className="pt-2 flex flex-col sm:flex-row items-center gap-2 border-t border-slate-800/80">
-                          <a
-                            href={cert.certificate_file_url || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            download={cert.certificate_code ? `${cert.certificate_code}.pdf` : 'SIGN_Certificate.pdf'}
-                            className="flex-1 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md shadow-emerald-950/30"
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadCertificate(cert)}
+                            className="flex-1 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
                           >
                             <Download className="w-4 h-4" />
                             <span>Download Certificate</span>
-                          </a>
+                          </button>
 
                           <button
                             type="button"
@@ -969,15 +1029,14 @@ export const CertificatesPage: React.FC = () => {
 
                 {verifiedCert.certificate_file_url && (
                   <div className="pt-2 flex justify-end">
-                    <a
-                      href={verifiedCert.certificate_file_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm"
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadCertificate(verifiedCert)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download Official Certificate File</span>
-                    </a>
+                    </button>
                   </div>
                 )}
               </div>

@@ -179,15 +179,27 @@ export const AdminCertificatesPage: React.FC = () => {
 
     // 1. Upload Certificate File if approving and new file selected
     if (isApproved && selectedFile) {
+      let base64Fallback = '';
+      try {
+        base64Fallback = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(selectedFile);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+        });
+      } catch {
+        // ignore
+      }
+
       if (isSupabaseConfigured) {
         try {
-          const fileExt = selectedFile.name.split('.').pop();
+          const fileExt = selectedFile.name.split('.').pop() || 'pdf';
           const fileName = `${finalCode || Date.now()}_${Date.now()}.${fileExt}`;
           const filePath = `${fileName}`;
 
           const { error: uploadErr } = await supabase.storage
             .from('certificates')
-            .upload(filePath, selectedFile, { upsert: true });
+            .upload(filePath, selectedFile, { upsert: true, contentType: selectedFile.type || 'application/pdf' });
 
           if (!uploadErr) {
             const { data: publicUrlData } = supabase.storage
@@ -196,19 +208,20 @@ export const AdminCertificatesPage: React.FC = () => {
             uploadedUrl = publicUrlData.publicUrl;
             uploadedPath = filePath;
           } else {
-            console.warn('[SIGN Admin Certificates] Storage upload notice:', uploadErr.message);
-            uploadedUrl = filePreviewUrl || 'https://raw.githubusercontent.com/saudurrahman-me/sign-smc/main/public/sample-certificate.pdf';
+            console.warn('[SIGN Admin Certificates] Storage bucket notice:', uploadErr.message);
+            // Fall back to clean Base64 data URL so the uploaded PDF is 100% valid and preserved!
+            uploadedUrl = base64Fallback || '/sample-certificate.pdf';
           }
         } catch (err) {
           console.warn('[SIGN Admin Certificates] Upload exception:', err);
-          uploadedUrl = filePreviewUrl || 'https://raw.githubusercontent.com/saudurrahman-me/sign-smc/main/public/sample-certificate.pdf';
+          uploadedUrl = base64Fallback || '/sample-certificate.pdf';
         }
       } else {
-        uploadedUrl = filePreviewUrl || 'https://raw.githubusercontent.com/saudurrahman-me/sign-smc/main/public/sample-certificate.pdf';
+        uploadedUrl = base64Fallback || '/sample-certificate.pdf';
       }
     } else if (isApproved && !uploadedUrl) {
-      // Default fallback certificate URL if none uploaded
-      uploadedUrl = 'https://raw.githubusercontent.com/saudurrahman-me/sign-smc/main/public/sample-certificate.pdf';
+      // Default fallback valid sample certificate
+      uploadedUrl = '/sample-certificate.pdf';
     }
 
     const updatedRecord: EventCertificate = {
@@ -309,24 +322,42 @@ export const AdminCertificatesPage: React.FC = () => {
     const finalCode = generateCertificateCode();
     const timestamp = new Date().toISOString();
 
-    let uploadedUrl = 'https://raw.githubusercontent.com/saudurrahman-me/sign-smc/main/public/sample-certificate.pdf';
+    let uploadedUrl = '/sample-certificate.pdf';
     let uploadedPath = `certificates/${finalCode}.pdf`;
 
-    if (directFile && isSupabaseConfigured) {
+    if (directFile) {
+      let base64Fallback = '';
       try {
-        const fileExt = directFile.name.split('.').pop();
-        const fileName = `${finalCode}.${fileExt}`;
-        const { error: uploadErr } = await supabase.storage
-          .from('certificates')
-          .upload(fileName, directFile, { upsert: true });
-
-        if (!uploadErr) {
-          const { data } = supabase.storage.from('certificates').getPublicUrl(fileName);
-          uploadedUrl = data.publicUrl;
-          uploadedPath = fileName;
-        }
+        base64Fallback = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(directFile);
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = (err) => reject(err);
+        });
       } catch {
-        // fallback
+        // ignore
+      }
+
+      if (isSupabaseConfigured) {
+        try {
+          const fileExt = directFile.name.split('.').pop() || 'pdf';
+          const fileName = `${finalCode}.${fileExt}`;
+          const { error: uploadErr } = await supabase.storage
+            .from('certificates')
+            .upload(fileName, directFile, { upsert: true, contentType: directFile.type || 'application/pdf' });
+
+          if (!uploadErr) {
+            const { data } = supabase.storage.from('certificates').getPublicUrl(fileName);
+            uploadedUrl = data.publicUrl;
+            uploadedPath = fileName;
+          } else {
+            uploadedUrl = base64Fallback || '/sample-certificate.pdf';
+          }
+        } catch {
+          uploadedUrl = base64Fallback || '/sample-certificate.pdf';
+        }
+      } else {
+        uploadedUrl = base64Fallback || '/sample-certificate.pdf';
       }
     }
 
