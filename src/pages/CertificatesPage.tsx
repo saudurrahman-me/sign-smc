@@ -164,7 +164,15 @@ export const CertificatesPage: React.FC = () => {
       const stored = localStorage.getItem('sign_user_certificates');
       if (stored) {
         const parsed: EventCertificate[] = JSON.parse(stored);
-        userLocalCerts = parsed.filter((c) => {
+        // Automatically purge btwerror test records requested by user
+        const cleaned = parsed.filter(
+          (c) => !c.student_email?.toLowerCase().includes('btwerror')
+        );
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem('sign_user_certificates', JSON.stringify(cleaned));
+        }
+
+        userLocalCerts = cleaned.filter((c) => {
           // Never include mock demo certificates
           if (c.id?.startsWith('demo-')) return false;
           // Must match current authenticated user ID or email

@@ -20,6 +20,7 @@ import {
   Loader2,
   Plus,
   Eye,
+  Trash2,
 } from 'lucide-react';
 
 export const AdminCertificatesPage: React.FC = () => {
@@ -100,13 +101,22 @@ export const AdminCertificatesPage: React.FC = () => {
   const fetchCertificates = async () => {
     setIsLoading(true);
 
-    // Check local storage for session edits (ignore mock demo items)
+    // Check local storage for session edits (ignore mock demo items and purge btwerror test certs)
     let localCerts: EventCertificate[] = [];
     try {
       const stored = localStorage.getItem('sign_user_certificates');
       if (stored) {
         const parsed: EventCertificate[] = JSON.parse(stored);
-        localCerts = parsed.filter((c) => !c.id?.startsWith('demo-'));
+        // Automatically purge btwerror test certificates requested by user
+        const cleaned = parsed.filter(
+          (c) =>
+            !c.id?.startsWith('demo-') &&
+            !c.student_email?.toLowerCase().includes('btwerror')
+        );
+        if (cleaned.length !== parsed.length) {
+          localStorage.setItem('sign_user_certificates', JSON.stringify(cleaned));
+        }
+        localCerts = cleaned;
       }
     } catch {
       // ignore
@@ -119,6 +129,16 @@ export const AdminCertificatesPage: React.FC = () => {
     }
 
     try {
+      // Clean up btwerror test records from database if table exists
+      try {
+        await supabase
+          .from('event_certificates')
+          .delete()
+          .ilike('student_email', '%btwerror%');
+      } catch {
+        // ignore
+      }
+
       const { data, error } = await supabase
         .from('event_certificates')
         .select('*')
@@ -128,9 +148,12 @@ export const AdminCertificatesPage: React.FC = () => {
         console.warn('[SIGN Admin Certificates] Fetch error:', error.message);
         setCertificates(localCerts);
       } else if (data) {
+        const sanitized = (data as EventCertificate[]).filter(
+          (c) => !c.student_email?.toLowerCase().includes('btwerror')
+        );
         const merged = [
-          ...localCerts.filter((l) => !data.some((d) => d.id === l.id)),
-          ...(data as EventCertificate[]),
+          ...localCerts.filter((l) => !sanitized.some((d) => d.id === l.id)),
+          ...sanitized,
         ];
         setCertificates(merged);
       } else {
@@ -141,6 +164,54 @@ export const AdminCertificatesPage: React.FC = () => {
       setCertificates(localCerts);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Permanently delete a certificate record
+  const handleDeleteCertificate = async (cert: EventCertificate) => {
+    const confirmDelete = window.confirm(
+      `Permanently delete the certificate record for "${cert.student_name}" (${cert.student_email})?\n\nThis will remove it from both the Admin dashboard and the student's portal.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      // 1. Remove from local storage
+      try {
+        const stored = localStorage.getItem('sign_user_certificates');
+        if (stored) {
+          const list: EventCertificate[] = JSON.parse(stored);
+          const filtered = list.filter((c) => c.id !== cert.id && c.certificate_code !== cert.certificate_code);
+          localStorage.setItem('sign_user_certificates', JSON.stringify(filtered));
+        }
+      } catch {
+        // ignore
+      }
+
+      // 2. Remove from Supabase if configured
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('event_certificates').delete().eq('id', cert.id);
+        } catch (err) {
+          console.warn('[SIGN Admin Certificates] Supabase delete warning:', err);
+        }
+
+        if (cert.certificate_file_path && !cert.certificate_file_path.includes('sample-certificate')) {
+          try {
+            await supabase.storage.from('certificates').remove([cert.certificate_file_path]);
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      // 3. Update state
+      setCertificates((prev) => prev.filter((c) => c.id !== cert.id));
+      if (selectedCert?.id === cert.id) {
+        setIsReviewModalOpen(false);
+      }
+    } catch (err) {
+      console.error('[SIGN Admin Certificates] Delete error:', err);
+      alert('Failed to delete certificate.');
     }
   };
 
@@ -723,6 +794,15 @@ export const AdminCertificatesPage: React.FC = () => {
                     <FileCheck className="w-3.5 h-3.5 text-slate-950" />
                     <span>{isPending ? 'Verify & Issue' : 'Review / Re-issue'}</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCertificate(cert)}
+                    className="p-2 rounded-xl text-slate-400 hover:text-rose-400 bg-slate-800 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+                    title={`Delete certificate record for ${cert.student_name}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             );
@@ -976,43 +1056,56 @@ export const AdminCertificatesPage: React.FC = () => {
             )}
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800">
               <button
                 type="button"
-                onClick={() => setIsReviewModalOpen(false)}
+                onClick={() => handleDeleteCertificate(selectedCert)}
                 disabled={isProcessing}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 border border-rose-900/40 transition-colors cursor-pointer"
+                title="Delete this certificate permanently"
               >
-                Cancel
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Record</span>
               </button>
 
-              <button
-                type="button"
-                onClick={handleProcessDecision}
-                disabled={isProcessing}
-                className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50 ${
-                  reviewAction === 'approve'
-                    ? 'text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 shadow-emerald-950/40'
-                    : 'text-white bg-rose-600 hover:bg-rose-500 shadow-rose-950/40'
-                }`}
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Processing...</span>
-                  </>
-                ) : reviewAction === 'approve' ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>Confirm & Issue Certificate</span>
-                  </>
-                ) : (
-                  <>
-                    <X className="w-3.5 h-3.5" />
-                    <span>Confirm Decline</span>
-                  </>
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReviewModalOpen(false)}
+                  disabled={isProcessing}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProcessDecision}
+                  disabled={isProcessing}
+                  className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md disabled:opacity-50 ${
+                    reviewAction === 'approve'
+                      ? 'text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 shadow-emerald-950/40'
+                      : 'text-white bg-rose-600 hover:bg-rose-500 shadow-rose-950/40'
+                  }`}
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : reviewAction === 'approve' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Confirm & Issue Certificate</span>
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-3.5 h-3.5" />
+                      <span>Confirm Decline</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
