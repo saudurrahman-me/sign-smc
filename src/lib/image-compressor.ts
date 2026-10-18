@@ -249,3 +249,41 @@ export function formatBytes(bytes: number, decimals = 1): string {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
+
+/**
+ * Automatically optimizes and compresses a certificate document image before upload.
+ * Preserves ultra-crisp typography (up to 1920px width) while reducing heavy 5 MB scans down to ~150-250 KB,
+ * preserving your free Supabase storage quota.
+ */
+export async function compressCertificateImage(file: File): Promise<CompressionResult> {
+  const originalSize = file.size;
+
+  // 1. If not an image (e.g. PDF), return as-is
+  if (!file.type || !file.type.startsWith('image/')) {
+    return {
+      file,
+      previewUrl: '',
+      originalSize,
+      compressedSize: originalSize,
+      compressionRatio: 1,
+      savedPercentage: 0,
+    };
+  }
+
+  // 2. If already lightweight (< 350 KB), keep original
+  if (originalSize <= 350 * 1024) {
+    const previewUrl = await readFileAsDataURL(file);
+    return {
+      file,
+      previewUrl,
+      originalSize,
+      compressedSize: originalSize,
+      compressionRatio: 1,
+      savedPercentage: 0,
+    };
+  }
+
+  // 3. Compress with high fidelity (max 1920x1920, quality 0.86)
+  return compressPaymentReceipt(file, 1920, 1920, 0.86);
+}
+

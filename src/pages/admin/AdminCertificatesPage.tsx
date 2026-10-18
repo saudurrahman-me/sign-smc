@@ -5,6 +5,7 @@ import {
   generateCertificateCode,
   sendCertificateEmailNotification,
 } from '../../lib/certificate-notifications';
+import { compressCertificateImage } from '../../lib/image-compressor';
 import type { EventCertificate, CertificateStatus, EventItem } from '../../types/database.types';
 import {
   Award,
@@ -46,6 +47,7 @@ export const AdminCertificatesPage: React.FC = () => {
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
   const [mailtoBackupUrl, setMailtoBackupUrl] = useState<string | null>(null);
   const [sendEmailNotification, setSendEmailNotification] = useState(false);
+  const [compressionInfo, setCompressionInfo] = useState<string | null>(null);
 
   // Direct Issue Modal State
   const [isDirectIssueOpen, setIsDirectIssueOpen] = useState(false);
@@ -206,6 +208,7 @@ export const AdminCertificatesPage: React.FC = () => {
     setGeneratedCode(cert.certificate_code || generateCertificateCode());
     setReviewerNotes(cert.reviewer_notes || '');
     setSelectedFile(null);
+    setCompressionInfo(null);
     setFilePreviewUrl(cert.certificate_file_url || null);
     setSendEmailNotification(cert.student_email?.toLowerCase() === 'saud.k478988@gmail.com');
     setActionSuccessMsg(null);
@@ -214,11 +217,19 @@ export const AdminCertificatesPage: React.FC = () => {
     setIsReviewModalOpen(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-      setFilePreviewUrl(URL.createObjectURL(file));
+      const rawFile = e.target.files[0];
+      const result = await compressCertificateImage(rawFile);
+      setSelectedFile(result.file);
+      setFilePreviewUrl(result.previewUrl || URL.createObjectURL(result.file));
+      if (result.savedPercentage > 0) {
+        setCompressionInfo(
+          `Optimized: ${(result.compressedSize / 1024).toFixed(0)} KB (${result.savedPercentage}% storage saved)`
+        );
+      } else {
+        setCompressionInfo(`File size: ${(result.compressedSize / 1024).toFixed(1)} KB`);
+      }
     }
   };
 
@@ -861,7 +872,9 @@ export const AdminCertificatesPage: React.FC = () => {
                       <span>{selectedFile ? selectedFile.name : 'Choose Certificate PDF / Image'}</span>
                     </label>
                     <p className="text-[10px] text-slate-500">
-                      {selectedFile
+                      {compressionInfo
+                        ? compressionInfo
+                        : selectedFile
                         ? `Selected: ${(selectedFile.size / 1024).toFixed(1)} KB`
                         : filePreviewUrl
                         ? 'Certificate file currently attached.'
@@ -1136,7 +1149,12 @@ export const AdminCertificatesPage: React.FC = () => {
                 <input
                   type="file"
                   accept=".pdf,.png,.jpg,.jpeg"
-                  onChange={(e) => e.target.files && setDirectFile(e.target.files[0])}
+                  onChange={async (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      const res = await compressCertificateImage(e.target.files[0]);
+                      setDirectFile(res.file);
+                    }
+                  }}
                   className="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-slate-200 hover:file:bg-slate-700"
                 />
               </div>
