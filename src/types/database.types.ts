@@ -98,6 +98,16 @@ export interface EventItem {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+
+  // Pricing & Payment Settings
+  is_paid?: boolean;
+  registration_fee?: number;
+  payment_instructions?: string | null;
+  bank_name?: string | null;
+  account_title?: string | null;
+  account_number?: string | null;
+  ambassador_code?: string | null;
+  ambassador_discount_percent?: number | null;
 }
 
 export interface MembershipApplication {
@@ -162,6 +172,7 @@ export interface EventCertificate {
 }
 
 export type AttendanceStatus = 'registered' | 'attended';
+export type PaymentStatus = 'free' | 'pending' | 'verified';
 
 export interface EventRegistration {
   id: string;
@@ -180,5 +191,16 @@ export interface EventRegistration {
   updated_at?: string;
   event_title?: string;
   event_date?: string;
+
+  // Payment & Ambassador details
+  is_paid?: boolean;
+  fee_amount?: number;
+  amount_paid?: number;
+  ambassador_code?: string | null;
+  discount_applied?: number;
+  payment_proof_url?: string | null;
+  payment_status?: PaymentStatus;
+  transaction_id?: string | null;
 }
+
 

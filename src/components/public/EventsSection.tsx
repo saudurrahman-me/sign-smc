@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight, CheckCircle2, CreditCard } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useOptionalAuth } from '../../context/AuthContext';
 import type { EventItem, EventCategory, EventRegistration } from '../../types/database.types';
@@ -227,10 +227,20 @@ export const EventsSection: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="absolute top-3 left-3">
+                  <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5">
                     <span className="px-2.5 py-1 rounded-md text-xs font-bold bg-[#031D12]/80 backdrop-blur-md text-emerald-300 border border-emerald-500/30">
                       {ev.category}
                     </span>
+                    {ev.is_paid && ev.registration_fee && ev.registration_fee > 0 ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-bold bg-amber-950/90 backdrop-blur-md text-amber-300 border border-amber-600/50 font-mono shadow-xs">
+                        <CreditCard className="w-3 h-3" />
+                        PKR {ev.registration_fee}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-950/80 backdrop-blur-md text-emerald-300 border border-emerald-500/30">
+                        Free
+                      </span>
+                    )}
                   </div>
 
                   {ev.is_virtual && (

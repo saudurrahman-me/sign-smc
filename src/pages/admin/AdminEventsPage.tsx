@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { EventItem, EventCategory, EventRegistration, AttendanceStatus } from '../../types/database.types';
+import type {
+  EventItem,
+  EventCategory,
+  EventRegistration,
+  AttendanceStatus,
+  PaymentStatus,
+} from '../../types/database.types';
 import { useAuth } from '../../context/AuthContext';
 import { compressPaymentReceipt } from '../../lib/image-compressor';
 import {
@@ -30,6 +36,9 @@ import {
   Check,
   Ticket,
   Clock,
+  CreditCard,
+  Tag,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const AdminEventsPage: React.FC = () => {
@@ -47,6 +56,8 @@ export const AdminEventsPage: React.FC = () => {
   const [isLoadingAttendees, setIsLoadingAttendees] = useState(false);
   const [attendeeSearchQuery, setAttendeeSearchQuery] = useState('');
   const [attendeeStatusFilter, setAttendeeStatusFilter] = useState<'all' | AttendanceStatus>('all');
+  const [attendeePaymentFilter, setAttendeePaymentFilter] = useState<'all' | 'free' | 'pending' | 'verified'>('all');
+  const [selectedReceiptReg, setSelectedReceiptReg] = useState<EventRegistration | null>(null);
   const [copiedEmailsFeedback, setCopiedEmailsFeedback] = useState(false);
   const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
 
@@ -69,6 +80,16 @@ export const AdminEventsPage: React.FC = () => {
   const [imageUploadError, setImageUploadError] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Payment & Pricing Settings
+  const [isPaid, setIsPaid] = useState(false);
+  const [registrationFee, setRegistrationFee] = useState<number | string>(500);
+  const [paymentInstructions, setPaymentInstructions] = useState('');
+  const [bankName, setBankName] = useState('Easypaisa');
+  const [accountTitle, setAccountTitle] = useState('Waqar Younas');
+  const [accountNumber, setAccountNumber] = useState('03179752692');
+  const [ambassadorCode, setAmbassadorCode] = useState('AMBASSADOR');
+  const [ambassadorDiscountPercent, setAmbassadorDiscountPercent] = useState<number | string>(20);
 
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [isPublished, setIsPublished] = useState(false);
@@ -103,6 +124,8 @@ export const AdminEventsPage: React.FC = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: null,
+      is_paid: false,
+      registration_fee: 0,
     },
     {
       id: 'demo-evt-2',
@@ -121,6 +144,14 @@ export const AdminEventsPage: React.FC = () => {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: null,
+      is_paid: true,
+      registration_fee: 500,
+      bank_name: 'Easypaisa',
+      account_title: 'Waqar Younas',
+      account_number: '03179752692',
+      ambassador_code: 'AMBASSADOR',
+      ambassador_discount_percent: 20,
+      payment_instructions: 'Please transfer fee via Easypaisa and ensure Transaction ID is visible on screenshot.',
     },
   ];
 
@@ -213,6 +244,8 @@ export const AdminEventsPage: React.FC = () => {
     setIsAttendeesModalOpen(true);
     setAttendeeSearchQuery('');
     setAttendeeStatusFilter('all');
+    setAttendeePaymentFilter('all');
+    setSelectedReceiptReg(null);
     setIsLoadingAttendees(true);
 
     let list: EventRegistration[] = [];
@@ -291,10 +324,50 @@ export const AdminEventsPage: React.FC = () => {
     }
   };
 
+  const handleUpdatePaymentStatus = async (regId: string, newStatus: PaymentStatus) => {
+    setIsUpdatingStatusId(regId);
+    try {
+      setAttendees((prev) =>
+        prev.map((a) => (a.id === regId ? { ...a, payment_status: newStatus } : a))
+      );
+
+      if (selectedReceiptReg && selectedReceiptReg.id === regId) {
+        setSelectedReceiptReg((prev) => (prev ? { ...prev, payment_status: newStatus } : null));
+      }
+
+      try {
+        const stored = localStorage.getItem('sign_event_registrations');
+        if (stored) {
+          const parsed: EventRegistration[] = JSON.parse(stored);
+          const updated = parsed.map((a) =>
+            a.id === regId ? { ...a, payment_status: newStatus } : a
+          );
+          localStorage.setItem('sign_event_registrations', JSON.stringify(updated));
+        }
+      } catch {
+        // ignore
+      }
+
+      if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(regId)) {
+        await supabase
+          .from('event_registrations')
+          .update({ payment_status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', regId);
+      }
+    } catch (err) {
+      console.warn('[SIGN Admin] Error updating payment status:', err);
+    } finally {
+      setIsUpdatingStatusId(null);
+    }
+  };
+
   const handleDeleteRegistration = async (regId: string) => {
     if (!window.confirm('Are you sure you want to remove this registration record?')) return;
 
     setAttendees((prev) => prev.filter((a) => a.id !== regId));
+    if (selectedReceiptReg?.id === regId) {
+      setSelectedReceiptReg(null);
+    }
 
     try {
       const stored = localStorage.getItem('sign_event_registrations');
@@ -317,6 +390,16 @@ export const AdminEventsPage: React.FC = () => {
   const filteredAttendees = attendees.filter((a) => {
     const matchesStatus =
       attendeeStatusFilter === 'all' || a.attendance_status === attendeeStatusFilter;
+
+    let matchesPayment = true;
+    if (attendeePaymentFilter === 'free') {
+      matchesPayment = !a.is_paid || a.payment_status === 'free';
+    } else if (attendeePaymentFilter === 'pending') {
+      matchesPayment = Boolean(a.is_paid && a.payment_status === 'pending');
+    } else if (attendeePaymentFilter === 'verified') {
+      matchesPayment = Boolean(a.is_paid && a.payment_status === 'verified');
+    }
+
     const q = attendeeSearchQuery.toLowerCase();
     const matchesSearch =
       !q ||
@@ -325,8 +408,11 @@ export const AdminEventsPage: React.FC = () => {
       a.phone.toLowerCase().includes(q) ||
       (a.registration_code && a.registration_code.toLowerCase().includes(q)) ||
       (a.student_id && a.student_id.toLowerCase().includes(q)) ||
-      (a.college_name && a.college_name.toLowerCase().includes(q));
-    return matchesStatus && matchesSearch;
+      (a.college_name && a.college_name.toLowerCase().includes(q)) ||
+      (a.ambassador_code && a.ambassador_code.toLowerCase().includes(q)) ||
+      (a.transaction_id && a.transaction_id.toLowerCase().includes(q));
+
+    return matchesStatus && matchesPayment && matchesSearch;
   });
 
   const copyAllAttendeeEmails = () => {
@@ -355,6 +441,14 @@ export const AdminEventsPage: React.FC = () => {
       'MBBS Year / Academic Program',
       'Student ID / Roll No',
       'Attendance Status',
+      'Fee Type',
+      'Fee Amount (PKR)',
+      'Amount Paid (PKR)',
+      'Ambassador Code',
+      'Discount Applied (PKR)',
+      'Payment Status',
+      'Transaction ID',
+      'Payment Proof URL',
       'Event Title',
       'Event Date',
       'Registered At',
@@ -370,6 +464,14 @@ export const AdminEventsPage: React.FC = () => {
       `"${a.mbbs_year || ''}"`,
       `"${a.student_id || ''}"`,
       `"${a.attendance_status}"`,
+      `"${a.is_paid ? 'Paid' : 'Free'}"`,
+      `"${a.fee_amount ?? 0}"`,
+      `"${a.amount_paid ?? 0}"`,
+      `"${a.ambassador_code || ''}"`,
+      `"${a.discount_applied ?? 0}"`,
+      `"${a.payment_status || (a.is_paid ? 'pending' : 'free')}"`,
+      `"${a.transaction_id || ''}"`,
+      `"${a.payment_proof_url || ''}"`,
       `"${(a.event_title || selectedEventForAttendees?.title || '').replace(/"/g, '""')}"`,
       `"${a.event_date || selectedEventForAttendees?.event_date || ''}"`,
       `"${new Date(a.created_at).toLocaleString()}"`,
@@ -390,8 +492,6 @@ export const AdminEventsPage: React.FC = () => {
     document.body.removeChild(link);
   };
 
-  const totalRegistrationsCount = Object.values(attendeeCounts).reduce((acc, c) => acc + c, 0);
-
   const openCreateModal = () => {
     setEditingEvent(null);
     setTitle('');
@@ -408,6 +508,17 @@ export const AdminEventsPage: React.FC = () => {
     setShowUrlInput(false);
     setRegistrationUrl('');
     setIsPublished(false);
+
+    // Reset payment fields
+    setIsPaid(false);
+    setRegistrationFee(500);
+    setPaymentInstructions('');
+    setBankName('Easypaisa');
+    setAccountTitle('Waqar Younas');
+    setAccountNumber('03179752692');
+    setAmbassadorCode('AMBASSADOR');
+    setAmbassadorDiscountPercent(20);
+
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -428,6 +539,17 @@ export const AdminEventsPage: React.FC = () => {
     setShowUrlInput(false);
     setRegistrationUrl(ev.registration_url || '');
     setIsPublished(ev.is_published);
+
+    // Initialize payment fields
+    setIsPaid(Boolean(ev.is_paid));
+    setRegistrationFee(ev.registration_fee ?? 500);
+    setPaymentInstructions(ev.payment_instructions || '');
+    setBankName(ev.bank_name || 'Easypaisa');
+    setAccountTitle(ev.account_title || 'Waqar Younas');
+    setAccountNumber(ev.account_number || '03179752692');
+    setAmbassadorCode(ev.ambassador_code || 'AMBASSADOR');
+    setAmbassadorDiscountPercent(ev.ambassador_discount_percent ?? 20);
+
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -451,7 +573,6 @@ export const AdminEventsPage: React.FC = () => {
     setImageUploadError(null);
 
     try {
-      // Compress to optimal web banner dimensions (1600x900)
       const compressed = await compressPaymentReceipt(file, 1600, 900, 0.85);
 
       if (!isSupabaseConfigured || isDevSession) {
@@ -507,7 +628,7 @@ export const AdminEventsPage: React.FC = () => {
 
     setIsSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
         category,
@@ -521,6 +642,16 @@ export const AdminEventsPage: React.FC = () => {
         registration_url: registrationUrl.trim() || null,
         is_published: isPublished,
         updated_at: new Date().toISOString(),
+
+        // Pricing & Payment Settings
+        is_paid: isPaid,
+        registration_fee: isPaid ? Number(registrationFee) || 0 : 0,
+        payment_instructions: isPaid ? paymentInstructions.trim() || null : null,
+        bank_name: isPaid ? bankName.trim() || 'Easypaisa' : null,
+        account_title: isPaid ? accountTitle.trim() || 'Waqar Younas' : null,
+        account_number: isPaid ? accountNumber.trim() || '03179752692' : null,
+        ambassador_code: isPaid ? ambassadorCode.trim().toUpperCase() || 'AMBASSADOR' : null,
+        ambassador_discount_percent: isPaid ? Number(ambassadorDiscountPercent) || 0 : 0,
       };
 
       if (isDevSession) {
@@ -528,15 +659,14 @@ export const AdminEventsPage: React.FC = () => {
         if (editingEvent) {
           updatedList = events.map((e) =>
             e.id === editingEvent.id
-              ? { ...e, ...payload, cover_image_url: payload.cover_image_url }
+              ? ({ ...e, ...payload } as EventItem)
               : e
           );
         } else {
           const newEv: EventItem = {
             id: `dev-evt-${Date.now()}`,
-            ...payload,
+            ...(payload as any),
             created_by: user?.id || null,
-            cover_image_url: payload.cover_image_url,
             created_at: new Date().toISOString(),
           };
           updatedList = [newEv, ...events];
@@ -552,23 +682,69 @@ export const AdminEventsPage: React.FC = () => {
       }
 
       if (editingEvent) {
-        const { data, error } = await supabase
+        let { data, error } = await supabase
           .from('events')
           .update(payload)
           .eq('id', editingEvent.id)
           .select();
+
+        // Fallback if migration hasn't been executed
+        if (error && (error.code === '42703' || error.message?.includes('is_paid'))) {
+          const basicPayload = {
+            title: title.trim(),
+            description: description.trim(),
+            category,
+            event_date: eventDate,
+            start_time: startTime || null,
+            end_time: endTime || null,
+            venue: venue.trim(),
+            is_virtual: isVirtual,
+            organizer: organizer.trim(),
+            cover_image_url: coverImageUrl.trim() || null,
+            registration_url: registrationUrl.trim() || null,
+            is_published: isPublished,
+            updated_at: new Date().toISOString(),
+          };
+          const res = await supabase.from('events').update(basicPayload).eq('id', editingEvent.id).select();
+          data = res.data;
+          error = res.error;
+        }
+
         if (error) throw error;
         if (!data || data.length === 0) {
-          throw new Error('Database permission denied: Supabase RLS blocked the update. Check that your account has event_manager or super_admin permissions.');
+          throw new Error('Database permission denied: Supabase RLS blocked the update.');
         }
       } else {
-        const { data, error } = await supabase.from('events').insert({
+        let { data, error } = await supabase.from('events').insert({
           ...payload,
           created_by: user?.id,
         }).select();
+
+        // Fallback if migration hasn't been executed
+        if (error && (error.code === '42703' || error.message?.includes('is_paid'))) {
+          const basicPayload = {
+            title: title.trim(),
+            description: description.trim(),
+            category,
+            event_date: eventDate,
+            start_time: startTime || null,
+            end_time: endTime || null,
+            venue: venue.trim(),
+            is_virtual: isVirtual,
+            organizer: organizer.trim(),
+            cover_image_url: coverImageUrl.trim() || null,
+            registration_url: registrationUrl.trim() || null,
+            is_published: isPublished,
+            created_by: user?.id,
+          };
+          const res = await supabase.from('events').insert(basicPayload).select();
+          data = res.data;
+          error = res.error;
+        }
+
         if (error) throw error;
         if (!data || data.length === 0) {
-          throw new Error('Database permission denied: Supabase RLS blocked the insert. Check that your account has event_manager or super_admin permissions.');
+          throw new Error('Database permission denied: Supabase RLS blocked the insert.');
         }
       }
 
@@ -583,117 +759,104 @@ export const AdminEventsPage: React.FC = () => {
   };
 
   const togglePublish = async (ev: EventItem) => {
+    const newStatus = !ev.is_published;
     if (isDevSession) {
-      const updatedList = events.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e));
-      setEvents(updatedList);
+      const updated = events.map((e) => (e.id === ev.id ? { ...e, is_published: newStatus } : e));
+      setEvents(updated);
       try {
-        sessionStorage.setItem('sign_dev_events', JSON.stringify(updatedList));
+        sessionStorage.setItem('sign_dev_events', JSON.stringify(updated));
       } catch {
         // ignore
       }
       return;
     }
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('events')
-        .update({ is_published: !ev.is_published, updated_at: new Date().toISOString() })
-        .eq('id', ev.id)
-        .select();
-
+        .update({ is_published: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', ev.id);
       if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Permission denied: Supabase RLS blocked the update.');
-      }
-      setEvents(events.map((e) => (e.id === ev.id ? { ...e, is_published: !e.is_published } : e)));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error updating publication status';
-      alert(msg);
+      setEvents(events.map((e) => (e.id === ev.id ? { ...e, is_published: newStatus } : e)));
+    } catch (err) {
+      console.error('[SIGN Admin Events] Error toggling status:', err);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this event? This action cannot be reversed.')) {
+    if (!window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
       return;
     }
-
     if (isDevSession) {
-      const updatedList = events.filter((e) => e.id !== id);
-      setEvents(updatedList);
+      const updated = events.filter((e) => e.id !== id);
+      setEvents(updated);
       try {
-        sessionStorage.setItem('sign_dev_events', JSON.stringify(updatedList));
+        sessionStorage.setItem('sign_dev_events', JSON.stringify(updated));
       } catch {
         // ignore
       }
       return;
     }
-
     try {
-      const { data, error } = await supabase.from('events').delete().eq('id', id).select();
+      const { error } = await supabase.from('events').delete().eq('id', id);
       if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Permission denied: Supabase RLS blocked the deletion.');
-      }
       setEvents(events.filter((e) => e.id !== id));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error deleting event';
-      alert(msg);
+    } catch (err) {
+      console.error('[SIGN Admin Events] Error deleting event:', err);
     }
   };
 
-  const filteredEvents = events.filter((ev) => {
+  const filteredEvents = events.filter((e) => {
     const matchesSearch =
-      ev.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      ev.venue.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'All' || ev.category === categoryFilter;
-    return matchesSearch && matchesCategory;
+      e.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.venue.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCat = categoryFilter === 'All' || e.category === categoryFilter;
+    return matchesSearch && matchesCat;
   });
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl w-full mx-auto space-y-6">
-      {/* Page Title & Action Bar */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
+    <div className="space-y-6">
+      {/* Top Banner / Title */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-teal-400 block mb-1">
-            Event Management Suite
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
-            Academic Activities & Seminars
+          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+            <Calendar className="w-6 h-6 text-teal-400" />
+            <span>Academic Events & Conferences</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Create, publish, and manage neurology seminars, clinical case clubs, and community drives.
+            Publish neurology conferences, workshops, webinars, and configure adjustable fees, ambassador codes, and attendee registrations.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => openAttendeesModal(null)}
-            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer shadow-xs"
-            title="View all attendees registered across all academic events"
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer shadow-sm"
           >
             <Users className="w-4 h-4 text-emerald-400" />
-            <span>All Registrations ({totalRegistrationsCount})</span>
+            <span>All Registrations</span>
           </button>
 
           <button
             onClick={openCreateModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-teal-400 to-cyan-300 hover:from-teal-300 hover:to-cyan-200 transition-all shadow-md cursor-pointer"
           >
             <Plus className="w-4 h-4" />
-            Create New Event
+            <span>Create Event</span>
           </button>
         </div>
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 rounded-2xl">
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-900/60 p-3 rounded-2xl border border-slate-800">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search events by title or venue..."
+            placeholder="Search by title, venue, keywords..."
             className="w-full pl-10 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
           />
         </div>
@@ -729,6 +892,7 @@ export const AdminEventsPage: React.FC = () => {
                 <tr>
                   <th className="py-3.5 px-4">Event Details</th>
                   <th className="py-3.5 px-4">Category</th>
+                  <th className="py-3.5 px-4">Pricing</th>
                   <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4">Venue</th>
                   <th className="py-3.5 px-4 text-center">Registrations</th>
@@ -762,6 +926,26 @@ export const AdminEventsPage: React.FC = () => {
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-800 text-teal-400 border border-slate-700">
                         {ev.category}
                       </span>
+                    </td>
+                    {/* Pricing Pill */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      {ev.is_paid && ev.registration_fee && ev.registration_fee > 0 ? (
+                        <div className="space-y-0.5">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono bg-amber-950/70 text-amber-300 border border-amber-700/50 inline-flex items-center gap-1">
+                            <CreditCard className="w-3 h-3" />
+                            PKR {ev.registration_fee}
+                          </span>
+                          {ev.ambassador_code && (
+                            <span className="block text-[9px] text-emerald-400 font-mono">
+                              Code: {ev.ambassador_code.split(',')[0]} (-{ev.ambassador_discount_percent ?? 20}%)
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800/80 text-slate-400 border border-slate-700/50">
+                          Free
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4 whitespace-nowrap">
                       <div className="text-slate-200 font-medium">{ev.event_date}</div>
@@ -849,24 +1033,27 @@ export const AdminEventsPage: React.FC = () => {
           </p>
           <button
             onClick={openCreateModal}
-            className="mt-4 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-teal-400 hover:bg-teal-300 transition-colors"
+            className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-teal-400 hover:bg-teal-300 transition-colors cursor-pointer"
           >
-            Create First Event
+            <Plus className="w-4 h-4" />
+            <span>Create First Event</span>
           </button>
         </div>
       )}
 
-      {/* Modal Dialog for Event Creation & Editing */}
+      {/* Create / Edit Event Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full p-6 sm:p-8 max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex items-center justify-between pb-4 mb-4 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white">
-                {editingEvent ? 'Edit Academic Event' : 'Schedule New Event'}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[92vh] overflow-y-auto shadow-2xl p-6 text-slate-200 text-xs">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-teal-400" />
+                <span>{editingEvent ? 'Edit Event Details' : 'Create New Event'}</span>
+              </h2>
               <button
+                type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -874,12 +1061,13 @@ export const AdminEventsPage: React.FC = () => {
 
             {formError && (
               <div className="mb-4 p-3 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
                 <span>{formError}</span>
               </div>
             )}
 
-            <form onSubmit={handleSave} className="space-y-4 text-xs">
+            <form onSubmit={handleSave} className="space-y-4">
+              {/* Event Title */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
                   Event Title <span className="text-rose-400">*</span>
@@ -889,18 +1077,34 @@ export const AdminEventsPage: React.FC = () => {
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Clinical Neurology Case Conference: Status Epilepticus"
+                  placeholder="e.g. Clinical Neuroscience Symposium 2026"
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Description */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1">
+                  Description & Learning Objectives <span className="text-rose-400">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  required
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Summarize the core topics, keynote speakers, and learning objectives..."
+                  className="w-full px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
+                />
+              </div>
+
+              {/* Category & Organizer */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Category</label>
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value as EventCategory)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                   >
                     {categories.map((c) => (
                       <option key={c} value={c}>
@@ -911,6 +1115,20 @@ export const AdminEventsPage: React.FC = () => {
                 </div>
 
                 <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Organizer</label>
+                  <input
+                    type="text"
+                    value={organizer}
+                    onChange={(e) => setOrganizer(e.target.value)}
+                    placeholder="SIGN SMC Chapter"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
+                  />
+                </div>
+              </div>
+
+              {/* Date & Time */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
                   <label className="block text-slate-300 font-semibold mb-1">
                     Event Date <span className="text-rose-400">*</span>
                   </label>
@@ -919,19 +1137,17 @@ export const AdminEventsPage: React.FC = () => {
                     required
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                   />
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-slate-300 font-semibold mb-1">Start Time</label>
                   <input
                     type="time"
                     value={startTime}
                     onChange={(e) => setStartTime(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                   />
                 </div>
 
@@ -941,108 +1157,72 @@ export const AdminEventsPage: React.FC = () => {
                     type="time"
                     value={endTime}
                     onChange={(e) => setEndTime(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">
-                    Venue / Meeting Info <span className="text-rose-400">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={venue}
-                    onChange={(e) => setVenue(e.target.value)}
-                    placeholder="e.g. Saidu Medical College Auditorium or Zoom"
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Organizer</label>
-                  <input
-                    type="text"
-                    value={organizer}
-                    onChange={(e) => setOrganizer(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
-                  />
-                </div>
-              </div>
-
+              {/* Venue */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  Description & Agenda <span className="text-rose-400">*</span>
+                  Venue / Location <span className="text-rose-400">*</span>
                 </label>
-                <textarea
-                  rows={4}
+                <input
+                  type="text"
                   required
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Outline the session agenda, faculty lead, target student year, and learning objectives..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  value={venue}
+                  onChange={(e) => setVenue(e.target.value)}
+                  placeholder="e.g. Saidu Medical College Auditorium / SGTH Neurology Dept"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                 />
               </div>
 
-              {/* Event Cover Image / Banner */}
+              {/* Cover Image Upload & Optimization */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="block text-slate-300 font-semibold">
-                    Event Cover Banner (16:9 Image)
+                    Cover Banner Image
                   </label>
                   <button
                     type="button"
                     onClick={() => setShowUrlInput(!showUrlInput)}
-                    className="text-[11px] text-teal-400 hover:text-teal-300 font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                    className="text-[11px] text-teal-400 hover:text-teal-300 inline-flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <LinkIcon className="w-3 h-3" />
-                    <span>{showUrlInput ? 'Hide URL input' : 'Or paste image URL'}</span>
+                    <span>{showUrlInput ? 'Hide URL link' : 'Or paste direct URL'}</span>
                   </button>
                 </div>
 
-                {/* Hidden File Input */}
                 <input
-                  type="file"
                   ref={fileInputRef}
-                  onChange={handleImageUpload}
+                  type="file"
                   accept="image/png,image/jpeg,image/webp,image/jpg"
+                  onChange={handleImageUpload}
                   className="hidden"
                 />
 
-                {/* Upload Error Alert */}
                 {imageUploadError && (
-                  <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-[11px] text-rose-300 flex items-center justify-between">
+                  <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 text-rose-400" />
                     <span>{imageUploadError}</span>
-                    <button
-                      type="button"
-                      onClick={() => setImageUploadError(null)}
-                      className="text-rose-400 hover:text-rose-200"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
                   </div>
                 )}
 
-                {/* Live Banner Preview OR Upload Dropzone */}
                 {coverImageUrl ? (
-                  <div className="relative group rounded-xl overflow-hidden border border-slate-700 bg-slate-950 aspect-video max-h-56 shadow-lg">
+                  <div className="relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 group">
                     <img
                       src={coverImageUrl}
-                      alt="Event Banner Preview"
-                      className="w-full h-full object-cover"
+                      alt="Banner Preview"
+                      className="w-full h-44 object-cover"
                     />
 
-                    {/* Active Badge */}
-                    <div className="absolute top-2.5 left-2.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-950/85 backdrop-blur-md text-emerald-300 border border-emerald-500/30">
+                    <div className="absolute top-2 left-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/90 text-emerald-300 border border-emerald-700/60 inline-flex items-center gap-1 shadow-sm">
                         <CheckCircle2 className="w-3 h-3 text-emerald-400" />
                         Active Banner
                       </span>
                     </div>
 
-                    {/* Action Bar on hover/overlay */}
                     <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
                       <button
                         type="button"
@@ -1105,7 +1285,6 @@ export const AdminEventsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Optional Direct URL Input Field */}
                 {showUrlInput && (
                   <div className="pt-1 animate-in fade-in duration-200">
                     <input
@@ -1119,17 +1298,167 @@ export const AdminEventsPage: React.FC = () => {
                 )}
               </div>
 
+              {/* ========================================================= */}
+              {/* REGISTRATION FEE & PAYMENT SETUP BLOCK                   */}
+              {/* ========================================================= */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-white text-xs uppercase tracking-wider">
+                      Registration Fee & Pricing Configuration
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsPaid(false)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        !isPaid
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Free Event
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsPaid(true)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isPaid
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Paid Event
+                    </button>
+                  </div>
+                </div>
+
+                {isPaid && (
+                  <div className="space-y-3.5 pt-3 border-t border-slate-800/80 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                          Registration Fee (PKR) <span className="text-rose-400">*</span>
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          required={isPaid}
+                          value={registrationFee}
+                          onChange={(e) => setRegistrationFee(e.target.value)}
+                          placeholder="500"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white font-mono focus:border-teal-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                          Bank / Payment Provider
+                        </label>
+                        <input
+                          type="text"
+                          value={bankName}
+                          onChange={(e) => setBankName(e.target.value)}
+                          placeholder="e.g. Easypaisa / Meezan Bank"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                          Account Title / Beneficiary Name
+                        </label>
+                        <input
+                          type="text"
+                          value={accountTitle}
+                          onChange={(e) => setAccountTitle(e.target.value)}
+                          placeholder="e.g. Waqar Younas (Finance Secretary)"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:border-teal-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                          Account Number / Mobile Wallet No
+                        </label>
+                        <input
+                          type="text"
+                          value={accountNumber}
+                          onChange={(e) => setAccountNumber(e.target.value)}
+                          placeholder="e.g. 03179752692"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white font-mono focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px] flex items-center gap-1">
+                          <Tag className="w-3 h-3 text-teal-400" />
+                          <span>Ambassador Discount Code(s)</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={ambassadorCode}
+                          onChange={(e) => setAmbassadorCode(e.target.value)}
+                          placeholder="e.g. AMBASSADOR, SMC2026"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white uppercase tracking-wider font-mono focus:border-teal-500"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          Attendees with this code receive ambassador discount
+                        </span>
+                      </div>
+
+                      <div>
+                        <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                          Ambassador Discount Percentage (%)
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          value={ambassadorDiscountPercent}
+                          onChange={(e) => setAmbassadorDiscountPercent(e.target.value)}
+                          placeholder="20"
+                          className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white font-mono focus:border-teal-500"
+                        />
+                        <span className="text-[10px] text-slate-500 mt-1 block">
+                          e.g. 20% discount (Set 100 for free ambassador registration)
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-slate-300 font-semibold mb-1 text-[11px]">
+                        Custom Payment Instructions (Optional)
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={paymentInstructions}
+                        onChange={(e) => setPaymentInstructions(e.target.value)}
+                        placeholder="e.g. Please transfer fee and upload screenshot with Transaction ID clearly visible."
+                        className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:border-teal-500"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Registration Link */}
               <div>
                 <label className="block text-slate-300 font-semibold mb-1">
-                  Registration Link (Optional)
+                  External Session / Zoom Link (Optional)
                 </label>
                 <input
                   type="url"
                   value={registrationUrl}
                   onChange={(e) => setRegistrationUrl(e.target.value)}
                   placeholder="https://zoom.us/j/... or session link"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-teal-500"
                 />
               </div>
 
@@ -1161,14 +1490,14 @@ export const AdminEventsPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800 transition-colors"
+                  className="px-4 py-2.5 rounded-xl text-slate-400 hover:text-white bg-slate-800 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="px-5 py-2.5 rounded-xl text-slate-950 font-bold bg-gradient-to-r from-teal-400 to-cyan-300 hover:from-teal-300 hover:to-cyan-200 disabled:opacity-50 transition-all shadow-md"
+                  className="px-5 py-2.5 rounded-xl text-slate-950 font-bold bg-gradient-to-r from-teal-400 to-cyan-300 hover:from-teal-300 hover:to-cyan-200 disabled:opacity-50 transition-all shadow-md cursor-pointer"
                 >
                   {isSaving ? 'Saving...' : editingEvent ? 'Save Changes' : 'Create Event'}
                 </button>
@@ -1180,20 +1509,20 @@ export const AdminEventsPage: React.FC = () => {
 
       {/* Event Attendees Management Modal */}
       {isAttendeesModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col text-xs text-slate-300">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-5xl w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col text-xs text-slate-300">
             {/* Modal Header */}
-            <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4 sticky top-0 bg-slate-900/95 backdrop-blur-md z-10">
+            <div className="p-5 sm:p-6 border-b border-slate-800 flex items-start justify-between gap-4 sticky top-0 bg-slate-900/95 backdrop-blur-md z-10">
               <div>
                 <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 mb-2">
                   <Users className="w-3 h-3 text-emerald-400" />
                   <span>
                     {selectedEventForAttendees
-                      ? 'Event Attendees & Registrations'
+                      ? 'Event Attendees & Payment Records'
                       : 'All Academic Event Registrations'}
                   </span>
                 </div>
-                <h3 className="text-xl font-black text-white">
+                <h3 className="text-lg sm:text-xl font-black text-white">
                   {selectedEventForAttendees
                     ? selectedEventForAttendees.title
                     : 'Comprehensive Chapter Attendee Directory'}
@@ -1215,6 +1544,14 @@ export const AdminEventsPage: React.FC = () => {
                       <MapPin className="w-3.5 h-3.5 text-slate-400" />
                       {selectedEventForAttendees.venue}
                     </span>
+                    {selectedEventForAttendees.is_paid && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-amber-300 font-bold bg-amber-950/60 px-2 py-0.5 rounded border border-amber-700/40">
+                          Fee: PKR {selectedEventForAttendees.registration_fee}
+                        </span>
+                      </>
+                    )}
                   </div>
                 )}
               </div>
@@ -1229,26 +1566,40 @@ export const AdminEventsPage: React.FC = () => {
             </div>
 
             {/* Metrics & Action Bar */}
-            <div className="p-6 border-b border-slate-800 space-y-4 bg-slate-950/50">
+            <div className="p-5 sm:p-6 border-b border-slate-800 space-y-4 bg-slate-950/50">
               <div className="flex flex-wrap items-center justify-between gap-4">
-                {/* Status Metrics */}
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                {/* Status & Payment Metrics */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-1.5">
                     <span className="text-slate-400">Total:</span>
                     <span className="font-bold text-white">{attendees.length}</span>
                   </div>
-                  <div className="px-3.5 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-800/40 flex items-center gap-2 text-emerald-300">
+                  <div className="px-3 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-800/40 flex items-center gap-1.5 text-emerald-300">
                     <span className="w-2 h-2 rounded-full bg-emerald-400" />
                     <span>Registered:</span>
                     <span className="font-bold text-emerald-200">
                       {attendees.filter((a) => a.attendance_status === 'registered').length}
                     </span>
                   </div>
-                  <div className="px-3.5 py-1.5 rounded-xl bg-cyan-950/50 border border-cyan-800/40 flex items-center gap-2 text-cyan-300">
+                  <div className="px-3 py-1.5 rounded-xl bg-cyan-950/50 border border-cyan-800/40 flex items-center gap-1.5 text-cyan-300">
                     <span className="w-2 h-2 rounded-full bg-cyan-400" />
                     <span>Attended:</span>
                     <span className="font-bold text-cyan-200">
                       {attendees.filter((a) => a.attendance_status === 'attended').length}
+                    </span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-amber-950/40 border border-amber-800/40 flex items-center gap-1.5 text-amber-300">
+                    <CreditCard className="w-3 h-3 text-amber-400" />
+                    <span>Pending Proofs:</span>
+                    <span className="font-bold text-amber-200">
+                      {attendees.filter((a) => a.is_paid && a.payment_status === 'pending').length}
+                    </span>
+                  </div>
+                  <div className="px-3 py-1.5 rounded-xl bg-emerald-950/40 border border-emerald-800/40 flex items-center gap-1.5 text-emerald-300">
+                    <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                    <span>Verified:</span>
+                    <span className="font-bold text-emerald-200">
+                      {attendees.filter((a) => a.is_paid && a.payment_status === 'verified').length}
                     </span>
                   </div>
                 </div>
@@ -1287,7 +1638,7 @@ export const AdminEventsPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Search & Filter Controls */}
+              {/* Search & Multi-Filters */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
                 <div className="relative w-full sm:w-80">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
@@ -1295,28 +1646,44 @@ export const AdminEventsPage: React.FC = () => {
                     type="text"
                     value={attendeeSearchQuery}
                     onChange={(e) => setAttendeeSearchQuery(e.target.value)}
-                    placeholder="Search by name, email, roll no, college..."
+                    placeholder="Search by name, email, code, ambassador..."
                     className="w-full pl-10 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500"
                   />
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-slate-400 whitespace-nowrap text-[11px]">Status:</span>
-                  <select
-                    value={attendeeStatusFilter}
-                    onChange={(e) => setAttendeeStatusFilter(e.target.value as any)}
-                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:border-teal-500"
-                  >
-                    <option value="all">All Registrations</option>
-                    <option value="registered">Registered Only</option>
-                    <option value="attended">Attended Only</option>
-                  </select>
+                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 whitespace-nowrap text-[11px]">Attendance:</span>
+                    <select
+                      value={attendeeStatusFilter}
+                      onChange={(e) => setAttendeeStatusFilter(e.target.value as any)}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:border-teal-500"
+                    >
+                      <option value="all">All Attendance</option>
+                      <option value="registered">Registered Only</option>
+                      <option value="attended">Attended Only</option>
+                    </select>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-400 whitespace-nowrap text-[11px]">Payment:</span>
+                    <select
+                      value={attendeePaymentFilter}
+                      onChange={(e) => setAttendeePaymentFilter(e.target.value as any)}
+                      className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:border-teal-500"
+                    >
+                      <option value="all">All Payments</option>
+                      <option value="free">Free Registrations</option>
+                      <option value="pending">Paid - Pending</option>
+                      <option value="verified">Paid - Verified</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Attendees Content Area */}
-            <div className="p-6">
+            <div className="p-5 sm:p-6">
               {isLoadingAttendees ? (
                 <div className="p-12 text-center space-y-3">
                   <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
@@ -1332,6 +1699,7 @@ export const AdminEventsPage: React.FC = () => {
                           <th className="py-3 px-4">Contact Info</th>
                           <th className="py-3 px-4">Academic Background</th>
                           {!selectedEventForAttendees && <th className="py-3 px-4">Event</th>}
+                          <th className="py-3 px-4">Payment & Receipt</th>
                           <th className="py-3 px-4">Questions / Notes</th>
                           <th className="py-3 px-4 text-center">Attendance</th>
                           <th className="py-3 px-4 text-right">Actions</th>
@@ -1383,7 +1751,7 @@ export const AdminEventsPage: React.FC = () => {
                                 {att.college_name}
                               </div>
                               {att.student_id && (
-                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                <div className="text-[10px] text-slate-500 mt-0.5 font-mono">
                                   Roll No: {att.student_id}
                                 </div>
                               )}
@@ -1400,6 +1768,85 @@ export const AdminEventsPage: React.FC = () => {
                                 </div>
                               </td>
                             )}
+
+                            {/* Payment & Receipt Column */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              {att.is_paid ? (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-mono font-bold text-white text-xs">
+                                      PKR {att.amount_paid ?? att.fee_amount ?? 0}
+                                    </span>
+
+                                    {att.ambassador_code && (
+                                      <span
+                                        className="text-[10px] font-mono text-emerald-300 bg-emerald-950/80 border border-emerald-700/50 px-1.5 py-0.5 rounded"
+                                        title={`Ambassador Code: ${att.ambassador_code} (Discount: PKR ${att.discount_applied ?? 0})`}
+                                      >
+                                        {att.ambassador_code}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    {/* Payment Status Toggle */}
+                                    <button
+                                      type="button"
+                                      disabled={isUpdatingStatusId === att.id}
+                                      onClick={() =>
+                                        handleUpdatePaymentStatus(
+                                          att.id,
+                                          att.payment_status === 'verified' ? 'pending' : 'verified'
+                                        )
+                                      }
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                        att.payment_status === 'verified'
+                                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700 hover:bg-emerald-900'
+                                          : 'bg-amber-950 text-amber-300 border border-amber-700 hover:bg-amber-900'
+                                      }`}
+                                      title="Click to toggle payment verification status"
+                                    >
+                                      {att.payment_status === 'verified' ? (
+                                        <>
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                          <span>Verified</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Clock className="w-3 h-3 text-amber-400" />
+                                          <span>Pending</span>
+                                        </>
+                                      )}
+                                    </button>
+
+                                    {/* Receipt Preview Thumbnail */}
+                                    {att.payment_proof_url ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedReceiptReg(att)}
+                                        className="inline-flex items-center gap-1 text-[10px] text-teal-300 hover:text-teal-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 px-2 py-0.5 rounded font-semibold transition-colors cursor-pointer"
+                                        title="Click to view payment proof screenshot"
+                                      >
+                                        <Eye className="w-3 h-3 text-teal-400" />
+                                        <span>Receipt</span>
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-500 italic">No receipt</span>
+                                    )}
+                                  </div>
+
+                                  {att.transaction_id && (
+                                    <div className="text-[10px] text-slate-400 font-mono">
+                                      TRX: {att.transaction_id}
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-900 border border-slate-800 text-slate-400">
+                                  Free Registration
+                                </span>
+                              )}
+                            </td>
 
                             {/* Questions / Notes */}
                             <td className="py-3.5 px-4 max-w-[200px]">
@@ -1464,12 +1911,118 @@ export const AdminEventsPage: React.FC = () => {
                   <Ticket className="w-10 h-10 text-slate-600 mx-auto mb-3" />
                   <h4 className="text-sm font-bold text-white">No Registrations Found</h4>
                   <p className="text-slate-400 text-xs mt-1 max-w-sm mx-auto">
-                    {attendeeSearchQuery || attendeeStatusFilter !== 'all'
+                    {attendeeSearchQuery || attendeeStatusFilter !== 'all' || attendeePaymentFilter !== 'all'
                       ? 'No registrations match your current search filters.'
-                      : 'No students have registered for this event yet. Once they register on the public website, their details and reference codes will be listed here.'}
+                      : 'No students have registered for this event yet.'}
                   </p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Full Receipt Viewer Modal for Admin */}
+      {selectedReceiptReg && selectedReceiptReg.payment_proof_url && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-5 flex flex-col gap-4 text-xs">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <div>
+                <span className="text-[10px] text-teal-400 font-bold uppercase tracking-wider block">
+                  Payment Receipt Verification
+                </span>
+                <h4 className="text-base font-bold text-white">
+                  {selectedReceiptReg.full_name} ({selectedReceiptReg.registration_code})
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedReceiptReg(null)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-[11px]">
+              <div>
+                <span className="text-slate-400 block text-[10px]">Fee Amount:</span>
+                <span className="font-mono font-bold text-white">
+                  PKR {selectedReceiptReg.amount_paid ?? selectedReceiptReg.fee_amount ?? 0}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Ambassador Code:</span>
+                <span className="font-mono text-emerald-300 font-semibold">
+                  {selectedReceiptReg.ambassador_code || 'None'}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px]">Verification:</span>
+                <span
+                  className={`font-semibold ${
+                    selectedReceiptReg.payment_status === 'verified'
+                      ? 'text-emerald-400'
+                      : 'text-amber-400'
+                  }`}
+                >
+                  {selectedReceiptReg.payment_status === 'verified' ? 'Verified' : 'Pending'}
+                </span>
+              </div>
+              {selectedReceiptReg.transaction_id && (
+                <div className="col-span-2 sm:col-span-3 pt-1 border-t border-slate-800/60 font-mono">
+                  <span className="text-slate-400">Transaction ID: </span>
+                  <span className="text-teal-300 font-bold">{selectedReceiptReg.transaction_id}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Receipt Image Display */}
+            <div className="max-h-[60vh] overflow-auto flex items-center justify-center rounded-2xl bg-slate-950 p-2 border border-slate-800">
+              <img
+                src={selectedReceiptReg.payment_proof_url}
+                alt="Payment proof receipt screenshot"
+                className="max-h-[55vh] w-auto object-contain rounded-xl"
+              />
+            </div>
+
+            {/* Footer verification actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+              <a
+                href={selectedReceiptReg.payment_proof_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-slate-400 hover:text-white"
+              >
+                <span>Open original image</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePaymentStatus(selectedReceiptReg.id, 'pending')}
+                  className={`px-3 py-1.5 rounded-xl font-semibold transition-colors cursor-pointer ${
+                    selectedReceiptReg.payment_status === 'pending'
+                      ? 'bg-amber-950 text-amber-300 border border-amber-700'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Mark as Pending
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleUpdatePaymentStatus(selectedReceiptReg.id, 'verified')}
+                  className={`px-3.5 py-1.5 rounded-xl font-bold transition-all cursor-pointer ${
+                    selectedReceiptReg.payment_status === 'verified'
+                      ? 'bg-emerald-600 text-white shadow-md'
+                      : 'bg-emerald-950 text-emerald-300 border border-emerald-700 hover:bg-emerald-900'
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 inline mr-1" />
+                  Mark as Verified
+                </button>
+              </div>
             </div>
           </div>
         </div>

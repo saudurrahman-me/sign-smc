@@ -22,6 +22,34 @@ const mockEvent: EventItem = {
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString(),
   created_by: null,
+  is_paid: false,
+  registration_fee: 0,
+};
+
+const mockPaidEvent: EventItem = {
+  id: 'test-paid-event-uuid-5678',
+  title: 'Advanced Stroke Localization & Thrombolytic Workshop 2026',
+  description: 'Hands-on practical neuro-imaging and clinical thrombolysis workshop.',
+  category: 'Research Workshops',
+  event_date: '2026-12-15',
+  start_time: '09:00:00',
+  end_time: '14:00:00',
+  venue: 'Saidu Teaching Hospital Neurology Lab',
+  is_virtual: false,
+  organizer: 'SIGN Academic Board',
+  cover_image_url: null,
+  registration_url: null,
+  is_published: true,
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+  created_by: null,
+  is_paid: true,
+  registration_fee: 500,
+  bank_name: 'Easypaisa',
+  account_title: 'Waqar Younas',
+  account_number: '03179752692',
+  ambassador_code: 'AMBASSADOR, SMC2026',
+  ambassador_discount_percent: 20,
 };
 
 describe('Event Registration System', () => {
@@ -31,7 +59,7 @@ describe('Event Registration System', () => {
     vi.clearAllMocks();
   });
 
-  it('renders registration form fields when modal is open', () => {
+  it('renders registration form fields when modal is open for a free event', () => {
     render(
       <EventRegistrationModal
         isOpen={true}
@@ -42,13 +70,14 @@ describe('Event Registration System', () => {
 
     expect(screen.getByText('Event Registration')).toBeInTheDocument();
     expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+    expect(screen.getByText(/Free Registration/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/Dr\. Muhammad Ahmad/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/student@example\.com/i)).toBeInTheDocument();
     expect(screen.getByPlaceholderText(/0300-1234567/i)).toBeInTheDocument();
     expect(screen.getByText(/Confirm Registration/i)).toBeInTheDocument();
   });
 
-  it('successfully completes registration and displays attendee pass with unique code', async () => {
+  it('successfully completes registration and displays attendee pass with unique code for free event', async () => {
     const handleSuccess = vi.fn();
 
     render(
@@ -136,24 +165,171 @@ describe('Event Registration System', () => {
     });
   });
 
-  it('renders Register button for upcoming events on EventsSection', async () => {
-    sessionStorage.setItem('sign_dev_events', JSON.stringify([mockEvent]));
+  it('renders fee, bank account details, and ambassador discount input for a paid event', () => {
+    render(
+      <EventRegistrationModal
+        isOpen={true}
+        onClose={() => {}}
+        event={mockPaidEvent}
+      />
+    );
+
+    expect(screen.getByText(/Registration Fee & Payment Details/i)).toBeInTheDocument();
+    expect(screen.getAllByText('PKR 500').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/Easypaisa Payment Details/i)).toBeInTheDocument();
+    expect(screen.getByText('Waqar Younas')).toBeInTheDocument();
+    expect(screen.getByText('03179752692')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/Enter Ambassador Code/i)).toBeInTheDocument();
+    expect(screen.getByText(/Upload Payment Proof Screenshot/i)).toBeInTheDocument();
+  });
+
+  it('validates and applies ambassador discount code correctly', async () => {
+    render(
+      <EventRegistrationModal
+        isOpen={true}
+        onClose={() => {}}
+        event={mockPaidEvent}
+      />
+    );
+
+    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador Code/i);
+    const applyBtn = screen.getByRole('button', { name: /Apply/i });
+
+    // Try invalid code
+    fireEvent.change(ambassadorInput, { target: { value: 'INVALID_CODE' } });
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/Invalid ambassador code/i)).toBeInTheDocument();
+    });
+
+    // Enter valid ambassador code
+    fireEvent.change(ambassadorInput, { target: { value: 'AMBASSADOR' } });
+    fireEvent.click(applyBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText(/20% discount/i)).toBeInTheDocument();
+      expect(screen.getByText(/20% OFF APPLIED/i)).toBeInTheDocument();
+    });
+
+    // Final fee: PKR 500 - 20% (100) = PKR 400
+    expect(screen.getByText('PKR 400')).toBeInTheDocument();
+  });
+
+  it('enforces payment receipt upload when registering for a paid event', async () => {
+    render(
+      <EventRegistrationModal
+        isOpen={true}
+        onClose={() => {}}
+        event={mockPaidEvent}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Dr\. Muhammad Ahmad/i), {
+      target: { value: 'Dr. Tariq Mahmood' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/student@example\.com/i), {
+      target: { value: 'tariq@smc.edu.pk' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/0300-1234567/i), {
+      target: { value: '0333-1234567' },
+    });
+
+    // Click submit without uploading receipt
+    fireEvent.click(screen.getByRole('button', { name: /Submit Registration & Payment/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Please upload proof of your event fee payment/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('successfully uploads payment receipt and completes paid event registration', async () => {
+    const handleSuccess = vi.fn();
+
+    render(
+      <EventRegistrationModal
+        isOpen={true}
+        onClose={() => {}}
+        event={mockPaidEvent}
+        onRegistrationSuccess={handleSuccess}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText(/Dr\. Muhammad Ahmad/i), {
+      target: { value: 'Dr. Fatima Tariq' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/student@example\.com/i), {
+      target: { value: 'fatima.tariq@smc.edu.pk' },
+    });
+    fireEvent.change(screen.getByPlaceholderText(/0300-1234567/i), {
+      target: { value: '0345-1122334' },
+    });
+
+    // Apply ambassador code
+    const ambassadorInput = screen.getByPlaceholderText(/Enter Ambassador Code/i);
+    fireEvent.change(ambassadorInput, { target: { value: 'SMC2026' } });
+    fireEvent.click(screen.getByRole('button', { name: /Apply/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/20% discount/i)).toBeInTheDocument();
+    });
+
+    // Attach fake payment receipt
+    const fakeFile = new File(['receipt-image-content'], 'easypaisa_receipt.jpg', {
+      type: 'image/jpeg',
+    });
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(fileInput).toBeInTheDocument();
+
+    fireEvent.change(fileInput, { target: { files: [fakeFile] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Payment proof attached/i)).toBeInTheDocument();
+    });
+
+    // Submit
+    fireEvent.click(screen.getByRole('button', { name: /Submit Registration & Payment/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Registration Confirmed!')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText(/Payment Pending Verification/i)).toBeInTheDocument();
+    expect(screen.getByText(/PKR 400/i)).toBeInTheDocument();
+    expect(screen.getByText(/Ambassador Code \(SMC2026\)/i)).toBeInTheDocument();
+
+    const stored = JSON.parse(localStorage.getItem('sign_event_registrations') || '[]');
+    expect(stored).toHaveLength(1);
+    expect(stored[0].is_paid).toBe(true);
+    expect(stored[0].fee_amount).toBe(500);
+    expect(stored[0].amount_paid).toBe(400);
+    expect(stored[0].ambassador_code).toBe('SMC2026');
+    expect(stored[0].discount_applied).toBe(100);
+    expect(stored[0].payment_status).toBe('pending');
+  });
+
+  it('renders Register button and pricing badge for upcoming events on EventsSection', async () => {
+    sessionStorage.setItem('sign_dev_events', JSON.stringify([mockPaidEvent]));
 
     render(<EventsSection />);
 
     await waitFor(() => {
-      expect(screen.getByText(mockEvent.title)).toBeInTheDocument();
+      expect(screen.getByText(mockPaidEvent.title)).toBeInTheDocument();
     });
+
+    expect(screen.getByText('PKR 500')).toBeInTheDocument();
 
     const regBtn = screen.getByRole('button', { name: /Register/i });
     expect(regBtn).toBeInTheDocument();
 
-    // Clicking Register opens the registration modal
+    // Clicking Register opens the registration modal with payment details
     fireEvent.click(regBtn);
 
     await waitFor(() => {
       expect(screen.getByText('Event Registration')).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/student@example\.com/i)).toBeInTheDocument();
+      expect(screen.getByText(/Easypaisa Payment Details/i)).toBeInTheDocument();
     });
   });
 
