@@ -22,6 +22,7 @@ import {
   Check,
   PlusCircle,
   LogIn,
+  Eye,
 } from 'lucide-react';
 
 export const CertificatesPage: React.FC = () => {
@@ -63,8 +64,9 @@ export const CertificatesPage: React.FC = () => {
   const [verifiedCert, setVerifiedCert] = useState<EventCertificate | null>(null);
   const [verifyError, setVerifyError] = useState<string | null>(null);
 
-  // QR Code Modal State
+  // Modal States
   const [selectedQrCert, setSelectedQrCert] = useState<EventCertificate | null>(null);
+  const [viewingCert, setViewingCert] = useState<EventCertificate | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
   // Keep studentName & email updated with auth
@@ -257,7 +259,21 @@ export const CertificatesPage: React.FC = () => {
     }
   };
 
-  // Safe certificate downloader that handles Base64 data URLs, Blobs, and Public PDFs
+  // Resolves the file format (PNG, JPG, WEBP, PDF)
+  const getCertificateExtension = (fileUrl: string, filePath?: string | null): string => {
+    if (fileUrl.startsWith('data:image/png')) return 'png';
+    if (fileUrl.startsWith('data:image/jpeg') || fileUrl.startsWith('data:image/jpg')) return 'jpg';
+    if (fileUrl.startsWith('data:image/webp')) return 'webp';
+    if (fileUrl.startsWith('data:application/pdf')) return 'pdf';
+
+    const check = (filePath || fileUrl.split('?')[0]).toLowerCase();
+    if (check.endsWith('.png')) return 'png';
+    if (check.endsWith('.jpg') || check.endsWith('.jpeg')) return 'jpg';
+    if (check.endsWith('.webp')) return 'webp';
+    return 'pdf';
+  };
+
+  // Safe certificate downloader that supports PNG, JPG, and PDF without extension mismatch
   const handleDownloadCertificate = async (cert: EventCertificate) => {
     const fileUrl =
       cert.certificate_file_url?.startsWith('blob:') ||
@@ -266,11 +282,12 @@ export const CertificatesPage: React.FC = () => {
         ? '/sample-certificate.pdf'
         : cert.certificate_file_url || '/sample-certificate.pdf';
 
+    const ext = getCertificateExtension(fileUrl, cert.certificate_file_path);
     const fileName = cert.certificate_code
-      ? `${cert.certificate_code}.pdf`
-      : 'SIGN_Certificate.pdf';
+      ? `${cert.certificate_code}.${ext}`
+      : `SIGN_Certificate.${ext}`;
 
-    // 1. Base64 Data URL (e.g. data:application/pdf;base64,...)
+    // 1. Base64 Data URL (e.g. data:image/png;base64,... or data:application/pdf;base64,...)
     if (fileUrl.startsWith('data:')) {
       const link = document.createElement('a');
       link.href = fileUrl;
@@ -281,7 +298,7 @@ export const CertificatesPage: React.FC = () => {
       return;
     }
 
-    // 2. Fetch binary blob to guarantee a clean, uncorrupted PDF download
+    // 2. Fetch binary blob to guarantee a clean, uncorrupted download with matching MIME type
     try {
       const res = await fetch(fileUrl);
       if (!res.ok) throw new Error('File download failed');
@@ -650,18 +667,55 @@ export const CertificatesPage: React.FC = () => {
                         )}
 
                         {isApproved && (
-                          <div className="p-3 rounded-xl bg-emerald-950/50 border border-emerald-900/60 text-emerald-300 text-xs space-y-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-[10px] uppercase font-bold text-emerald-400">
-                                Certificate Verification ID
-                              </span>
-                              <span className="font-mono font-bold text-white text-xs">
-                                {cert.certificate_code}
-                              </span>
+                          <div className="space-y-3">
+                            {/* Certificate Image Thumbnail Preview if PNG/JPG */}
+                            {cert.certificate_file_url && (() => {
+                              const fileUrl =
+                                cert.certificate_file_url?.startsWith('blob:') ||
+                                (cert.certificate_file_url?.includes('raw.githubusercontent.com') &&
+                                  cert.certificate_file_url?.includes('sample-certificate.pdf'))
+                                  ? '/sample-certificate.pdf'
+                                  : cert.certificate_file_url;
+                              const ext = getCertificateExtension(fileUrl, cert.certificate_file_path);
+                              if (ext === 'png' || ext === 'jpg' || ext === 'webp') {
+                                return (
+                                  <div
+                                    onClick={() => setViewingCert(cert)}
+                                    className="relative h-28 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/60 cursor-pointer group"
+                                    title="Click to view full certificate"
+                                  >
+                                    <img
+                                      src={fileUrl}
+                                      alt={cert.event_title}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end justify-between p-2.5">
+                                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-slate-900/90 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                                        {ext.toUpperCase()} Certificate
+                                      </span>
+                                      <span className="text-[11px] text-white flex items-center gap-1 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Eye className="w-3.5 h-3.5 text-emerald-400" /> View Full
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return null;
+                            })()}
+
+                            <div className="p-3 rounded-xl bg-emerald-950/50 border border-emerald-900/60 text-emerald-300 text-xs space-y-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] uppercase font-bold text-emerald-400">
+                                  Certificate Verification ID
+                                </span>
+                                <span className="font-mono font-bold text-white text-xs">
+                                  {cert.certificate_code}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-400">
+                                Issued: {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : 'Active'}
+                              </p>
                             </div>
-                            <p className="text-[11px] text-slate-400">
-                              Issued: {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : 'Active'}
-                            </p>
                           </div>
                         )}
                       </div>
@@ -671,20 +725,30 @@ export const CertificatesPage: React.FC = () => {
                         <div className="pt-2 flex flex-col sm:flex-row items-center gap-2 border-t border-slate-800/80">
                           <button
                             type="button"
-                            onClick={() => handleDownloadCertificate(cert)}
-                            className="flex-1 w-full inline-flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+                            onClick={() => setViewingCert(cert)}
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
                           >
-                            <Download className="w-4 h-4" />
-                            <span>Download Certificate</span>
+                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>View</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadCertificate(cert)}
+                            className="flex-1 w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            <span>Download ({getCertificateExtension(cert.certificate_file_url || '', cert.certificate_file_path).toUpperCase()})</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => setSelectedQrCert(cert)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                            title="Verify QR Code"
                           >
-                            <QrCode className="w-4 h-4 text-emerald-400" />
-                            <span>Verify QR</span>
+                            <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>QR</span>
                           </button>
                         </div>
                       )}
@@ -1028,14 +1092,23 @@ export const CertificatesPage: React.FC = () => {
                 </div>
 
                 {verifiedCert.certificate_file_url && (
-                  <div className="pt-2 flex justify-end">
+                  <div className="pt-2 flex items-center justify-end gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => setViewingCert(verifiedCert)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>View Full Certificate</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => handleDownloadCertificate(verifiedCert)}
                       className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Download Official Certificate File</span>
+                      <span>Download ({getCertificateExtension(verifiedCert.certificate_file_url || '', verifiedCert.certificate_file_path).toUpperCase()})</span>
                     </button>
                   </div>
                 )}
@@ -1105,6 +1178,89 @@ export const CertificatesPage: React.FC = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Certificate Viewer Modal Dialog (PNG / Image / PDF) */}
+        {viewingCert && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+            onClick={() => setViewingCert(null)}
+          >
+            <div
+              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setViewingCert(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer z-10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-start justify-between pr-8 border-b border-slate-800 pb-3">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    <Award className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <span className="line-clamp-1">{viewingCert.event_title || 'Certificate of Participation'}</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Awarded to <strong className="text-slate-200">{viewingCert.student_name}</strong> &bull; Verification Code: <span className="font-mono text-emerald-400 font-semibold">{viewingCert.certificate_code}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Certificate Media Viewer */}
+              <div className="flex-1 overflow-auto rounded-2xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-center p-2 min-h-[320px]">
+                {(() => {
+                  const fileUrl =
+                    viewingCert.certificate_file_url?.startsWith('blob:') ||
+                    (viewingCert.certificate_file_url?.includes('raw.githubusercontent.com') &&
+                      viewingCert.certificate_file_url?.includes('sample-certificate.pdf'))
+                      ? '/sample-certificate.pdf'
+                      : viewingCert.certificate_file_url || '/sample-certificate.pdf';
+                  const ext = getCertificateExtension(fileUrl, viewingCert.certificate_file_path);
+
+                  if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'webp') {
+                    return (
+                      <img
+                        src={fileUrl}
+                        alt={`${viewingCert.student_name}'s Certificate`}
+                        className="max-h-[62vh] max-w-full object-contain rounded-xl shadow-2xl"
+                      />
+                    );
+                  }
+
+                  return (
+                    <iframe
+                      src={fileUrl}
+                      title="Certificate Document Viewer"
+                      className="w-full h-[62vh] rounded-xl border-0 bg-slate-900"
+                    />
+                  );
+                })()}
+              </div>
+
+              {/* Viewer Footer */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+                <span className="text-[11px] text-slate-400">
+                  Format:{' '}
+                  <strong className="text-emerald-400 uppercase font-mono">
+                    {getCertificateExtension(viewingCert.certificate_file_url || '', viewingCert.certificate_file_path)}
+                  </strong>
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadCertificate(viewingCert)}
+                  className="inline-flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download {getCertificateExtension(viewingCert.certificate_file_url || '', viewingCert.certificate_file_path).toUpperCase()} File</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
