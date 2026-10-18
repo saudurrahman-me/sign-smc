@@ -29,9 +29,13 @@ export const LeadershipSection: React.FC = () => {
                 (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
             if (match) {
+              const orderNum = Number(p.display_order);
               return {
                 ...p,
-                display_order: match.display_order,
+                display_order:
+                  typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                    ? orderNum
+                    : match.display_order,
                 bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
                 academic_year: p.academic_year || match.academic_year,
                 photo_url: p.photo_url || match.photo_url,
@@ -78,9 +82,13 @@ export const LeadershipSection: React.FC = () => {
                 (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
             if (fallbackMatch) {
+              const orderNum = Number(p.display_order);
               return {
                 ...p,
-                display_order: fallbackMatch.display_order,
+                display_order:
+                  typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                    ? orderNum
+                    : fallbackMatch.display_order,
                 bio:
                   p.bio &&
                   p.bio.trim().length > 15 &&
@@ -111,11 +119,12 @@ export const LeadershipSection: React.FC = () => {
   }, []);
 
   // 1. Patron & Faculty Mentors (Prof. Dr. Muhammad Ayub Khan, Dr. Fawad Ali, Dr. Amjad Iqbal)
-  const mainLeaders = [
+  const mainLeaders = ([
     profiles.find((p) => p.full_name.toLowerCase().includes('ayub')),
     profiles.find((p) => p.full_name.toLowerCase().includes('fawad')),
     profiles.find((p) => p.full_name.toLowerCase().includes('amjad')),
-  ].filter(Boolean) as LeadershipProfile[];
+  ].filter((p): p is LeadershipProfile => Boolean(p)))
+    .sort((a, b) => a.display_order - b.display_order);
 
   // 2. Executive Committee & Student Stewards (All executive members in order)
   const mainLeaderIds = new Set(mainLeaders.map((p) => p.id));

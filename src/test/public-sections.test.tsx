@@ -1,13 +1,17 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AboutSection } from '../components/public/AboutSection';
 import { MissionVisionSection } from '../components/public/MissionVisionSection';
 import { LeadershipSection } from '../components/public/LeadershipSection';
 import { EventsSection } from '../components/public/EventsSection';
 import { ContactSection } from '../components/public/ContactSection';
-import { OFFICIAL_CONTENT } from '../data/fallback-content';
+import { OFFICIAL_CONTENT, INITIAL_LEADERSHIP_PLACEHOLDERS } from '../data/fallback-content';
 
 describe('Public Website Academic Sections', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+  });
   it('renders official Preamble verbatim without modification', () => {
     render(<AboutSection />);
     expect(screen.getByText(/About SIGN Chapter/i)).toBeInTheDocument();
@@ -81,6 +85,30 @@ describe('Public Website Academic Sections', () => {
     // Girls sequence: 1st Eshaal, then Hadia, then Yusra
     expect(eshaalPos).toBeLessThan(hadiaPos);
     expect(hadiaPos).toBeLessThan(yusraPos);
+  });
+
+  it('respects user-configured display_order rank when updated in storage', () => {
+    // Custom order: rank Dr. Amjad Iqbal (rank 2) before Dr. Fawad Ali (rank 3)
+    const customProfiles = INITIAL_LEADERSHIP_PLACEHOLDERS.map((p) => {
+      if (p.full_name === 'Dr. Amjad Iqbal') {
+        return { ...p, display_order: 2 };
+      }
+      if (p.full_name === 'Dr. Fawad Ali') {
+        return { ...p, display_order: 3 };
+      }
+      return p;
+    });
+    sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(customProfiles));
+
+    const { container } = render(<LeadershipSection />);
+    const textContent = container.textContent || '';
+    const fawadPos = textContent.indexOf('Dr. Fawad Ali');
+    const amjadPos = textContent.indexOf('Dr. Amjad Iqbal');
+
+    expect(fawadPos).toBeGreaterThan(-1);
+    expect(amjadPos).toBeGreaterThan(-1);
+    // Dr. Amjad Iqbal (rank 2) must appear before Dr. Fawad Ali (rank 3)
+    expect(amjadPos).toBeLessThan(fawadPos);
   });
 
   it('renders events section with clean empty state when no upcoming events exist', () => {

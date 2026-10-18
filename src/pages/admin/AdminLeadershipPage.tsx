@@ -134,9 +134,13 @@ export const AdminLeadershipPage: React.FC = () => {
                 (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
             );
             if (match) {
+              const orderNum = Number(p.display_order);
               return {
                 ...p,
-                display_order: match.display_order,
+                display_order:
+                  typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                    ? orderNum
+                    : match.display_order,
                 bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
                 academic_year: p.academic_year || match.academic_year,
                 photo_url: p.photo_url || match.photo_url,
@@ -182,9 +186,13 @@ export const AdminLeadershipPage: React.FC = () => {
               (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
           );
           if (fallbackMatch) {
+            const orderNum = Number(p.display_order);
             return {
               ...p,
-              display_order: fallbackMatch.display_order,
+              display_order:
+                typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                  ? orderNum
+                  : fallbackMatch.display_order,
               bio:
                 p.bio &&
                 p.bio.trim().length > 15 &&
