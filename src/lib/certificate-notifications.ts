@@ -135,7 +135,40 @@ export async function sendCertificateEmailNotification(
 ): Promise<EmailDispatchResult> {
   const content = buildCertificateEmailContent(params);
 
-  // 1. Try Supabase Edge Function if connected
+  // 1. Try Vercel Serverless Function (Resend API)
+  try {
+    const apiResponse = await fetch('/api/send-certificate-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: params.studentEmail,
+        studentName: params.studentName,
+        eventTitle: params.eventTitle,
+        status: params.status,
+        certificateCode: params.certificateCode,
+        reviewerNotes: params.reviewerNotes,
+        subject: content.subject,
+        html: content.bodyHtml,
+        text: content.bodyText,
+      }),
+    });
+
+    if (apiResponse.ok) {
+      const data = await apiResponse.json();
+      if (data?.success) {
+        return {
+          success: true,
+          channel: 'edge_function',
+          message: `Official certificate email automatically sent to ${params.studentEmail} via Resend.`,
+          mailtoUrl: content.mailtoUrl,
+        };
+      }
+    }
+  } catch {
+    // Fall through to Supabase or Webhook
+  }
+
+  // 2. Try Supabase Edge Function if connected
   if (isSupabaseConfigured) {
     try {
       const { data, error } = await supabase.functions.invoke('send-certificate-email', {
