@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { EventItem, EventCategory } from '../../types/database.types';
+import type { EventItem, EventCategory, EventRegistration, AttendanceStatus } from '../../types/database.types';
 import { useAuth } from '../../context/AuthContext';
 import { compressPaymentReceipt } from '../../lib/image-compressor';
 import {
@@ -22,6 +22,14 @@ import {
   CheckCircle2,
   RefreshCw,
   Link as LinkIcon,
+  Users,
+  Download,
+  Mail,
+  Phone,
+  ExternalLink,
+  Check,
+  Ticket,
+  Clock,
 } from 'lucide-react';
 
 export const AdminEventsPage: React.FC = () => {
@@ -30,6 +38,17 @@ export const AdminEventsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All');
+
+  // Attendees & Registration Management State
+  const [attendeeCounts, setAttendeeCounts] = useState<Record<string, number>>({});
+  const [selectedEventForAttendees, setSelectedEventForAttendees] = useState<EventItem | null>(null);
+  const [isAttendeesModalOpen, setIsAttendeesModalOpen] = useState(false);
+  const [attendees, setAttendees] = useState<EventRegistration[]>([]);
+  const [isLoadingAttendees, setIsLoadingAttendees] = useState(false);
+  const [attendeeSearchQuery, setAttendeeSearchQuery] = useState('');
+  const [attendeeStatusFilter, setAttendeeStatusFilter] = useState<'all' | AttendanceStatus>('all');
+  const [copiedEmailsFeedback, setCopiedEmailsFeedback] = useState(false);
+  const [isUpdatingStatusId, setIsUpdatingStatusId] = useState<string | null>(null);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -145,9 +164,233 @@ export const AdminEventsPage: React.FC = () => {
     }
   };
 
+  const fetchAttendeeCounts = async () => {
+    const counts: Record<string, number> = {};
+    try {
+      const localStored = localStorage.getItem('sign_event_registrations');
+      if (localStored) {
+        const parsed: EventRegistration[] = JSON.parse(localStored);
+        parsed.forEach((r) => {
+          if (r.attendance_status !== 'cancelled') {
+            counts[r.event_id] = (counts[r.event_id] || 0) + 1;
+          }
+        });
+      }
+    } catch {
+      // ignore
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase
+          .from('event_registrations')
+          .select('event_id, attendance_status');
+
+        if (!error && data) {
+          const dbCounts: Record<string, number> = {};
+          data.forEach((r: { event_id: string; attendance_status: string }) => {
+            if (r.attendance_status !== 'cancelled') {
+              dbCounts[r.event_id] = (dbCounts[r.event_id] || 0) + 1;
+            }
+          });
+          setAttendeeCounts((prev) => ({ ...prev, ...dbCounts }));
+          return;
+        }
+      } catch {
+        // Table may not exist yet if migration pending
+      }
+    }
+    setAttendeeCounts(counts);
+  };
+
   useEffect(() => {
     fetchEvents();
+    fetchAttendeeCounts();
   }, [user]);
+
+  const openAttendeesModal = async (ev: EventItem | null) => {
+    setSelectedEventForAttendees(ev);
+    setIsAttendeesModalOpen(true);
+    setAttendeeSearchQuery('');
+    setAttendeeStatusFilter('all');
+    setIsLoadingAttendees(true);
+
+    let list: EventRegistration[] = [];
+    try {
+      const stored = localStorage.getItem('sign_event_registrations');
+      if (stored) {
+        const parsed: EventRegistration[] = JSON.parse(stored);
+        list = ev ? parsed.filter((r) => r.event_id === ev.id) : parsed;
+      }
+    } catch {
+      // ignore
+    }
+
+    if (isSupabaseConfigured) {
+      try {
+        let query = supabase
+          .from('event_registrations')
+          .select('*, events(title, event_date)')
+          .order('created_at', { ascending: false });
+
+        if (ev && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ev.id)) {
+          query = query.eq('event_id', ev.id);
+        }
+
+        const { data, error } = await query;
+        if (!error && data) {
+          const dbMapped: EventRegistration[] = data.map((d: any) => ({
+            ...d,
+            event_title: d.events?.title || d.event_title,
+            event_date: d.events?.event_date || d.event_date,
+          }));
+
+          const seenCodes = new Set(dbMapped.map((r) => r.registration_code || r.id));
+          const localOnly = list.filter((r) => !seenCodes.has(r.registration_code || r.id));
+          list = [...dbMapped, ...localOnly];
+        }
+      } catch (err) {
+        console.warn('[SIGN Admin] Supabase event_registrations query error:', err);
+      }
+    }
+
+    setAttendees(list);
+    setIsLoadingAttendees(false);
+  };
+
+  const handleUpdateAttendanceStatus = async (regId: string, newStatus: AttendanceStatus) => {
+    setIsUpdatingStatusId(regId);
+    try {
+      setAttendees((prev) =>
+        prev.map((a) => (a.id === regId ? { ...a, attendance_status: newStatus } : a))
+      );
+
+      try {
+        const stored = localStorage.getItem('sign_event_registrations');
+        if (stored) {
+          const parsed: EventRegistration[] = JSON.parse(stored);
+          const updated = parsed.map((a) =>
+            a.id === regId ? { ...a, attendance_status: newStatus } : a
+          );
+          localStorage.setItem('sign_event_registrations', JSON.stringify(updated));
+        }
+      } catch {
+        // ignore
+      }
+
+      if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(regId)) {
+        await supabase
+          .from('event_registrations')
+          .update({ attendance_status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', regId);
+      }
+
+      fetchAttendeeCounts();
+    } finally {
+      setIsUpdatingStatusId(null);
+    }
+  };
+
+  const handleDeleteRegistration = async (regId: string) => {
+    if (!window.confirm('Are you sure you want to remove this registration record?')) return;
+
+    setAttendees((prev) => prev.filter((a) => a.id !== regId));
+
+    try {
+      const stored = localStorage.getItem('sign_event_registrations');
+      if (stored) {
+        const parsed: EventRegistration[] = JSON.parse(stored);
+        const updated = parsed.filter((a) => a.id !== regId);
+        localStorage.setItem('sign_event_registrations', JSON.stringify(updated));
+      }
+    } catch {
+      // ignore
+    }
+
+    if (isSupabaseConfigured && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(regId)) {
+      await supabase.from('event_registrations').delete().eq('id', regId);
+    }
+
+    fetchAttendeeCounts();
+  };
+
+  const filteredAttendees = attendees.filter((a) => {
+    const matchesStatus =
+      attendeeStatusFilter === 'all' || a.attendance_status === attendeeStatusFilter;
+    const q = attendeeSearchQuery.toLowerCase();
+    const matchesSearch =
+      !q ||
+      a.full_name.toLowerCase().includes(q) ||
+      a.email.toLowerCase().includes(q) ||
+      a.phone.toLowerCase().includes(q) ||
+      (a.registration_code && a.registration_code.toLowerCase().includes(q)) ||
+      (a.student_id && a.student_id.toLowerCase().includes(q)) ||
+      (a.college_name && a.college_name.toLowerCase().includes(q));
+    return matchesStatus && matchesSearch;
+  });
+
+  const copyAllAttendeeEmails = () => {
+    const emails = filteredAttendees
+      .map((a) => a.email.trim())
+      .filter((e) => Boolean(e) && e.includes('@'));
+    const unique = Array.from(new Set(emails));
+    if (unique.length === 0) return;
+    navigator.clipboard.writeText(unique.join(', '));
+    setCopiedEmailsFeedback(true);
+    setTimeout(() => setCopiedEmailsFeedback(false), 2500);
+  };
+
+  const exportAttendeesCsv = () => {
+    if (filteredAttendees.length === 0) {
+      alert('No attendees to export for current filter.');
+      return;
+    }
+
+    const headers = [
+      'Registration Code',
+      'Attendee Name',
+      'Email Address',
+      'WhatsApp / Phone',
+      'College / Institution',
+      'MBBS Year / Academic Program',
+      'Student ID / Roll No',
+      'Attendance Status',
+      'Event Title',
+      'Event Date',
+      'Registered At',
+      'Questions / Topics',
+    ];
+
+    const rows = filteredAttendees.map((a) => [
+      `"${a.registration_code || ''}"`,
+      `"${a.full_name.replace(/"/g, '""')}"`,
+      `"${a.email}"`,
+      `"${a.phone}"`,
+      `"${(a.college_name || '').replace(/"/g, '""')}"`,
+      `"${a.mbbs_year || ''}"`,
+      `"${a.student_id || ''}"`,
+      `"${a.attendance_status}"`,
+      `"${(a.event_title || selectedEventForAttendees?.title || '').replace(/"/g, '""')}"`,
+      `"${a.event_date || selectedEventForAttendees?.event_date || ''}"`,
+      `"${new Date(a.created_at).toLocaleString()}"`,
+      `"${(a.questions_or_notes || '').replace(/"/g, '""').replace(/\n/g, ' ')}"`,
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const eventSlug = selectedEventForAttendees
+      ? selectedEventForAttendees.title.toLowerCase().replace(/[^a-z0-9]/g, '-').slice(0, 30)
+      : 'all-events';
+    link.setAttribute('href', url);
+    link.setAttribute('download', `sign-attendees-${eventSlug}-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const totalRegistrationsCount = Object.values(attendeeCounts).reduce((acc, c) => acc + c, 0);
 
   const openCreateModal = () => {
     setEditingEvent(null);
@@ -421,13 +664,25 @@ export const AdminEventsPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/30"
-        >
-          <Plus className="w-4 h-4" />
-          Create New Event
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => openAttendeesModal(null)}
+            className="inline-flex items-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer shadow-xs"
+            title="View all attendees registered across all academic events"
+          >
+            <Users className="w-4 h-4 text-emerald-400" />
+            <span>All Registrations ({totalRegistrationsCount})</span>
+          </button>
+
+          <button
+            onClick={openCreateModal}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Create New Event
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -476,6 +731,7 @@ export const AdminEventsPage: React.FC = () => {
                   <th className="py-3.5 px-4">Category</th>
                   <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4">Venue</th>
+                  <th className="py-3.5 px-4 text-center">Registrations</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -524,6 +780,18 @@ export const AdminEventsPage: React.FC = () => {
                         )}
                         <span className="truncate">{ev.venue}</span>
                       </div>
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => openAttendeesModal(ev)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 border border-emerald-800/60 hover:border-emerald-600 transition-all cursor-pointer shadow-xs group/btn"
+                        title="View & manage registered attendees for this event"
+                      >
+                        <Users className="w-3.5 h-3.5 text-emerald-400 group-hover/btn:scale-110 transition-transform" />
+                        <span>{attendeeCounts[ev.id] || 0}</span>
+                        <span className="text-[11px] text-emerald-400/80">Registered</span>
+                      </button>
                     </td>
                     <td className="py-4 px-4 text-center whitespace-nowrap">
                       <button
@@ -906,6 +1174,323 @@ export const AdminEventsPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Event Attendees Management Modal */}
+      {isAttendeesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full max-h-[92vh] overflow-y-auto shadow-2xl flex flex-col text-xs text-slate-300">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-slate-800 flex items-start justify-between gap-4 sticky top-0 bg-slate-900/95 backdrop-blur-md z-10">
+              <div>
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 mb-2">
+                  <Users className="w-3 h-3 text-emerald-400" />
+                  <span>
+                    {selectedEventForAttendees
+                      ? 'Event Attendees & Registrations'
+                      : 'All Academic Event Registrations'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-black text-white">
+                  {selectedEventForAttendees
+                    ? selectedEventForAttendees.title
+                    : 'Comprehensive Chapter Attendee Directory'}
+                </h3>
+                {selectedEventForAttendees && (
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-slate-400 text-xs">
+                    <span className="inline-flex items-center gap-1 text-emerald-400 font-semibold">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {selectedEventForAttendees.event_date}
+                    </span>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-teal-400" />
+                      {selectedEventForAttendees.start_time?.slice(0, 5) || '10:00'} -{' '}
+                      {selectedEventForAttendees.end_time?.slice(0, 5) || '12:00'}
+                    </span>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      {selectedEventForAttendees.venue}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAttendeesModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Metrics & Action Bar */}
+            <div className="p-6 border-b border-slate-800 space-y-4 bg-slate-950/50">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                {/* Status Metrics */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2">
+                    <span className="text-slate-400">Total:</span>
+                    <span className="font-bold text-white">{attendees.length}</span>
+                  </div>
+                  <div className="px-3.5 py-1.5 rounded-xl bg-emerald-950/50 border border-emerald-800/40 flex items-center gap-2 text-emerald-300">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                    <span>Registered:</span>
+                    <span className="font-bold text-emerald-200">
+                      {attendees.filter((a) => a.attendance_status === 'registered').length}
+                    </span>
+                  </div>
+                  <div className="px-3.5 py-1.5 rounded-xl bg-cyan-950/50 border border-cyan-800/40 flex items-center gap-2 text-cyan-300">
+                    <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                    <span>Attended:</span>
+                    <span className="font-bold text-cyan-200">
+                      {attendees.filter((a) => a.attendance_status === 'attended').length}
+                    </span>
+                  </div>
+                  <div className="px-3.5 py-1.5 rounded-xl bg-rose-950/40 border border-rose-800/40 flex items-center gap-2 text-rose-300">
+                    <span className="w-2 h-2 rounded-full bg-rose-400" />
+                    <span>Cancelled:</span>
+                    <span className="font-bold text-rose-200">
+                      {attendees.filter((a) => a.attendance_status === 'cancelled').length}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Batch Actions */}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyAllAttendeeEmails}
+                    disabled={filteredAttendees.length === 0}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                    title="Copy all filtered attendee emails for batch announcements or invites"
+                  >
+                    {copiedEmailsFeedback ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-300 font-bold">Emails Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="w-3.5 h-3.5 text-teal-400" />
+                        <span>Copy Emails</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={exportAttendeesCsv}
+                    disabled={filteredAttendees.length === 0}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer shadow-md shadow-emerald-950/30 disabled:opacity-50"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Export CSV</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Search & Filter Controls */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                <div className="relative w-full sm:w-80">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-2.5" />
+                  <input
+                    type="text"
+                    value={attendeeSearchQuery}
+                    onChange={(e) => setAttendeeSearchQuery(e.target.value)}
+                    placeholder="Search by name, email, roll no, college..."
+                    className="w-full pl-10 pr-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-teal-500"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <span className="text-slate-400 whitespace-nowrap text-[11px]">Status:</span>
+                  <select
+                    value={attendeeStatusFilter}
+                    onChange={(e) => setAttendeeStatusFilter(e.target.value as any)}
+                    className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-200 focus:border-teal-500"
+                  >
+                    <option value="all">All Registrations</option>
+                    <option value="registered">Registered Only</option>
+                    <option value="attended">Attended Only</option>
+                    <option value="cancelled">Cancelled Only</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Attendees Content Area */}
+            <div className="p-6">
+              {isLoadingAttendees ? (
+                <div className="p-12 text-center space-y-3">
+                  <Loader2 className="w-8 h-8 text-teal-400 animate-spin mx-auto" />
+                  <p className="text-slate-400">Loading attendee registrations...</p>
+                </div>
+              ) : filteredAttendees.length > 0 ? (
+                <div className="border border-slate-800 rounded-2xl overflow-hidden bg-slate-950 shadow-inner">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-900/90 text-slate-400 uppercase font-semibold border-b border-slate-800">
+                        <tr>
+                          <th className="py-3 px-4">Attendee & Pass</th>
+                          <th className="py-3 px-4">Contact Info</th>
+                          <th className="py-3 px-4">Academic Background</th>
+                          {!selectedEventForAttendees && <th className="py-3 px-4">Event</th>}
+                          <th className="py-3 px-4">Questions / Notes</th>
+                          <th className="py-3 px-4 text-center">Attendance</th>
+                          <th className="py-3 px-4 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 text-slate-300">
+                        {filteredAttendees.map((att) => (
+                          <tr key={att.id} className="hover:bg-slate-900/50 transition-colors">
+                            {/* Attendee & Pass */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="font-bold text-white text-sm">{att.full_name}</div>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className="font-mono text-[10px] text-teal-300 font-semibold bg-teal-950/60 px-1.5 py-0.5 rounded border border-teal-800/40">
+                                  {att.registration_code}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Contact Info */}
+                            <td className="py-3.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-1.5 text-slate-300">
+                                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <a
+                                  href={`mailto:${att.email}`}
+                                  className="hover:text-teal-300 transition-colors"
+                                >
+                                  {att.email}
+                                </a>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-slate-400 text-[11px] mt-1">
+                                <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                <a
+                                  href={`https://wa.me/${att.phone.replace(/[^0-9]/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:text-emerald-300 transition-colors inline-flex items-center gap-1"
+                                  title="Open WhatsApp chat"
+                                >
+                                  <span>{att.phone}</span>
+                                  <ExternalLink className="w-2.5 h-2.5 text-emerald-500" />
+                                </a>
+                              </div>
+                            </td>
+
+                            {/* Academic Background */}
+                            <td className="py-3.5 px-4">
+                              <div className="font-medium text-slate-200">{att.mbbs_year}</div>
+                              <div className="text-[11px] text-slate-400 line-clamp-1" title={att.college_name}>
+                                {att.college_name}
+                              </div>
+                              {att.student_id && (
+                                <div className="text-[10px] text-slate-500 mt-0.5">
+                                  Roll No: {att.student_id}
+                                </div>
+                              )}
+                            </td>
+
+                            {/* Event if "All" is active */}
+                            {!selectedEventForAttendees && (
+                              <td className="py-3.5 px-4 max-w-[180px]">
+                                <div className="font-semibold text-white line-clamp-1" title={att.event_title}>
+                                  {att.event_title || 'Academic Event'}
+                                </div>
+                                <div className="text-[11px] text-emerald-400">
+                                  {att.event_date}
+                                </div>
+                              </td>
+                            )}
+
+                            {/* Questions / Notes */}
+                            <td className="py-3.5 px-4 max-w-[200px]">
+                              {att.questions_or_notes ? (
+                                <p className="text-[11px] text-slate-300 line-clamp-2" title={att.questions_or_notes}>
+                                  "{att.questions_or_notes}"
+                                </p>
+                              ) : (
+                                <span className="text-[11px] text-slate-600 italic">None submitted</span>
+                              )}
+                            </td>
+
+                            {/* Attendance Status Control */}
+                            <td className="py-3.5 px-4 text-center whitespace-nowrap">
+                              <div className="inline-flex rounded-lg p-0.5 bg-slate-900 border border-slate-800 text-[10px] font-bold">
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingStatusId === att.id}
+                                  onClick={() => handleUpdateAttendanceStatus(att.id, 'registered')}
+                                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                                    att.attendance_status === 'registered'
+                                      ? 'bg-emerald-600 text-white shadow-xs'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  Registered
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingStatusId === att.id}
+                                  onClick={() => handleUpdateAttendanceStatus(att.id, 'attended')}
+                                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                                    att.attendance_status === 'attended'
+                                      ? 'bg-cyan-600 text-white shadow-xs'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  Attended
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={isUpdatingStatusId === att.id}
+                                  onClick={() => handleUpdateAttendanceStatus(att.id, 'cancelled')}
+                                  className={`px-2 py-1 rounded-md transition-colors cursor-pointer ${
+                                    att.attendance_status === 'cancelled'
+                                      ? 'bg-rose-700 text-white shadow-xs'
+                                      : 'text-slate-400 hover:text-white'
+                                  }`}
+                                >
+                                  Cancelled
+                                </button>
+                              </div>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRegistration(att.id)}
+                                className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
+                                title="Remove Registration"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-12 text-center rounded-2xl bg-slate-950/60 border border-slate-800">
+                  <Ticket className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                  <h4 className="text-sm font-bold text-white">No Registrations Found</h4>
+                  <p className="text-slate-400 text-xs mt-1 max-w-sm mx-auto">
+                    {attendeeSearchQuery || attendeeStatusFilter !== 'all'
+                      ? 'No registrations match your current search filters.'
+                      : 'No students have registered for this event yet. Once they register on the public website, their details and reference codes will be listed here.'}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

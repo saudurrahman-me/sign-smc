@@ -161,3 +161,24 @@ export interface EventCertificate {
   updated_at: string;
 }
 
+export type AttendanceStatus = 'registered' | 'attended' | 'cancelled';
+
+export interface EventRegistration {
+  id: string;
+  event_id: string;
+  user_id: string | null;
+  full_name: string;
+  email: string;
+  phone: string;
+  college_name: string;
+  mbbs_year: string;
+  student_id: string | null;
+  questions_or_notes: string | null;
+  attendance_status: AttendanceStatus;
+  registration_code: string;
+  created_at: string;
+  updated_at?: string;
+  event_title?: string;
+  event_date?: string;
+}
+

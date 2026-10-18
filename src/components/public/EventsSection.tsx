@@ -1,13 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, Clock, MapPin, ExternalLink, Video, Filter, Sparkles, BookOpen } from 'lucide-react';
+import { Calendar, Clock, MapPin, Video, Filter, Sparkles, BookOpen, Ticket, ArrowRight } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { EventItem, EventCategory } from '../../types/database.types';
+import { EventRegistrationModal } from './EventRegistrationModal';
 
 export const EventsSection: React.FC = () => {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [selectedEventForReg, setSelectedEventForReg] = useState<EventItem | null>(null);
+  const [isRegModalOpen, setIsRegModalOpen] = useState(false);
 
   const categories: Array<'All' | EventCategory> = [
     'All',
@@ -205,22 +208,29 @@ export const EventsSection: React.FC = () => {
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-[200px]">
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-xs text-slate-500 truncate max-w-[170px]">
                       <MapPin className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
                       <span className="truncate">{ev.venue}</span>
                     </div>
 
-                    {ev.registration_url && (
-                      <a
-                        href={ev.registration_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#016533] hover:bg-[#015229] transition-colors"
+                    {ev.event_date >= todayStr ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedEventForReg(ev);
+                          setIsRegModalOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#015229] shadow-xs hover:shadow transition-all group/btn cursor-pointer"
                       >
-                        Register
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
+                        <Ticket className="w-3.5 h-3.5" />
+                        <span>Register</span>
+                        <ArrowRight className="w-3 h-3 group-hover/btn:translate-x-0.5 transition-transform" />
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                        Concluded
+                      </span>
                     )}
                   </div>
                 </div>
@@ -255,6 +265,18 @@ export const EventsSection: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* In-Website Event Registration Modal */}
+      {isRegModalOpen && (
+        <EventRegistrationModal
+          isOpen={isRegModalOpen}
+          onClose={() => {
+            setIsRegModalOpen(false);
+            setSelectedEventForReg(null);
+          }}
+          event={selectedEventForReg}
+        />
+      )}
     </section>
   );
 };
