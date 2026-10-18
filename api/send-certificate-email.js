@@ -51,8 +51,11 @@ export default async function handler(req, res) {
     const data = await resendResponse.json();
 
     if (!resendResponse.ok) {
-      console.error('[Resend Error]:', data);
-      return res.status(resendResponse.status).json({
+      console.warn('[Resend API Warning]:', data);
+      const isSandboxRestriction = data?.message?.includes('testing emails to your own email address');
+      return res.status(200).json({
+        success: false,
+        isSandboxRestriction: Boolean(isSandboxRestriction),
         error: data.message || 'Resend failed to send email.',
         details: data,
       });

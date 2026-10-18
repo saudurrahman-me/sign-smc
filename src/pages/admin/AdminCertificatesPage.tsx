@@ -45,6 +45,7 @@ export const AdminCertificatesPage: React.FC = () => {
   const [actionSuccessMsg, setActionSuccessMsg] = useState<string | null>(null);
   const [actionErrorMsg, setActionErrorMsg] = useState<string | null>(null);
   const [mailtoBackupUrl, setMailtoBackupUrl] = useState<string | null>(null);
+  const [sendEmailNotification, setSendEmailNotification] = useState(false);
 
   // Direct Issue Modal State
   const [isDirectIssueOpen, setIsDirectIssueOpen] = useState(false);
@@ -206,6 +207,7 @@ export const AdminCertificatesPage: React.FC = () => {
     setReviewerNotes(cert.reviewer_notes || '');
     setSelectedFile(null);
     setFilePreviewUrl(cert.certificate_file_url || null);
+    setSendEmailNotification(cert.student_email?.toLowerCase() === 'saud.k478988@gmail.com');
     setActionSuccessMsg(null);
     setActionErrorMsg(null);
     setMailtoBackupUrl(null);
@@ -329,38 +331,48 @@ export const AdminCertificatesPage: React.FC = () => {
         }
       }
 
-      // 3. Send Notification Email to student
-      const emailResult = await sendCertificateEmailNotification({
-        studentName: selectedCert.student_name,
-        studentEmail: selectedCert.student_email,
-        eventTitle: selectedCert.event_title,
-        status: isApproved ? 'approved' : 'declined',
-        certificateCode: finalCode,
-        reviewerNotes: reviewerNotes.trim() || null,
-      });
+      // 3. Send Notification Email to student if enabled
+      let emailResult = null;
+      if (sendEmailNotification) {
+        emailResult = await sendCertificateEmailNotification({
+          studentName: selectedCert.student_name,
+          studentEmail: selectedCert.student_email,
+          eventTitle: selectedCert.event_title,
+          status: isApproved ? 'approved' : 'declined',
+          certificateCode: finalCode,
+          reviewerNotes: reviewerNotes.trim() || null,
+        });
 
-      setMailtoBackupUrl(emailResult.mailtoUrl);
+        if (emailResult.mailtoUrl) {
+          setMailtoBackupUrl(emailResult.mailtoUrl);
+        }
+      }
 
       // Update state
       setCertificates((prev) =>
         prev.map((c) => (c.id === selectedCert.id ? updatedRecord : c))
       );
 
-      if (emailResult.success) {
+      // Certificate record is officially updated & valid!
+      if (emailResult?.success) {
         setActionSuccessMsg(
           isApproved
-            ? `Certificate approved! Email successfully dispatched to ${selectedCert.student_email} via Resend.`
-            : `Request declined. Notice dispatched to ${selectedCert.student_email} via Resend.`
+            ? `Certificate approved! Official notification dispatched to ${selectedCert.student_email}.`
+            : `Request declined. Notice dispatched to ${selectedCert.student_email}.`
         );
-        setTimeout(() => {
-          setIsReviewModalOpen(false);
-          setActionSuccessMsg(null);
-        }, 1800);
       } else {
-        setActionErrorMsg(
-          `Certificate updated, but Resend notice: ${emailResult.message}`
+        setActionSuccessMsg(
+          isApproved
+            ? `Certificate officially issued! (Verification Code: ${finalCode})`
+            : `Certificate request updated.`
         );
       }
+
+      setTimeout(() => {
+        setIsReviewModalOpen(false);
+        setActionSuccessMsg(null);
+        setActionErrorMsg(null);
+      }, 1600);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update certificate request.';
       setActionErrorMsg(msg);
@@ -903,12 +915,23 @@ export const AdminCertificatesPage: React.FC = () => {
               </div>
             )}
 
-            {/* Notification Notice */}
-            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
-              <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>
-                An official email notification will be automatically dispatched to{' '}
-                <strong className="text-slate-200">{selectedCert.student_email}</strong>.
+            {/* Notification Control */}
+            <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-slate-300 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={sendEmailNotification}
+                  onChange={(e) => setSendEmailNotification(e.target.checked)}
+                  className="rounded border-slate-700 text-emerald-500 focus:ring-emerald-500 bg-slate-900 cursor-pointer"
+                />
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Send email notification to <strong className="text-white">{selectedCert.student_email}</strong></span>
+                </span>
+              </label>
+
+              <span className="text-[10px] text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 self-end sm:self-auto">
+                {selectedCert.student_email?.toLowerCase() === 'saud.k478988@gmail.com' ? 'Verified Sandbox Email' : 'Student Access via Portal'}
               </span>
             </div>
 

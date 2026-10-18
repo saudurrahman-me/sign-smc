@@ -164,11 +164,18 @@ export async function sendCertificateEmailNotification(
       };
     } else {
       const errText = data?.error || data?.message || 'Resend API call unsuccessful';
+      const isSandboxRestriction =
+        data?.isSandboxRestriction ||
+        errText.includes('own email address') ||
+        errText.includes('resend.com/domains');
+
       console.warn('[Resend API notice]:', errText);
       return {
         success: false,
         channel: 'client_fallback',
-        message: `Resend error: ${errText}`,
+        message: isSandboxRestriction
+          ? 'Resend sandbox mode requires a verified custom domain to send to external students.'
+          : `Resend notice: ${errText}`,
         mailtoUrl: content.mailtoUrl,
       };
     }
