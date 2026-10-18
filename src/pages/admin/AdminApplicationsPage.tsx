@@ -19,6 +19,10 @@ import {
   Trash2,
   HardDrive,
   Zap,
+  Calendar,
+  Save,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 
 export const AdminApplicationsPage: React.FC = () => {
@@ -44,6 +48,86 @@ export const AdminApplicationsPage: React.FC = () => {
   const [isResolvingProof, setIsResolvingProof] = useState<boolean>(false);
   const [proofImageError, setProofImageError] = useState<boolean>(false);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
+
+  // Semester Schedule Modal State
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [scheduleOpen, setScheduleOpen] = useState<boolean>(true);
+  const [scheduleTermName, setScheduleTermName] = useState<string>('');
+  const [scheduleStartDate, setScheduleStartDate] = useState<string>('');
+  const [scheduleEndDate, setScheduleEndDate] = useState<string>('');
+  const [scheduleClosedMessage, setScheduleClosedMessage] = useState<string>('');
+  const [isSavingSchedule, setIsSavingSchedule] = useState<boolean>(false);
+  const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState<string | null>(null);
+  const [scheduleErrorMsg, setScheduleErrorMsg] = useState<string | null>(null);
+
+  const openScheduleModal = () => {
+    setScheduleOpen(siteSettings.membership_open ?? true);
+    setScheduleTermName(siteSettings.membership_term_name || 'Fall 2026 Semester Intake');
+    setScheduleStartDate(siteSettings.membership_start_date || '');
+    setScheduleEndDate(siteSettings.membership_end_date || '');
+    setScheduleClosedMessage(
+      siteSettings.membership_closed_message ||
+        'Membership applications for the current academic session are currently closed. The next cohort enrollment will open at the start of the upcoming semester.'
+    );
+    setScheduleSuccessMsg(null);
+    setScheduleErrorMsg(null);
+    setIsScheduleModalOpen(true);
+  };
+
+  const handleSaveSchedule = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingSchedule(true);
+    setScheduleErrorMsg(null);
+    setScheduleSuccessMsg(null);
+
+    const updatedSettings: SiteSettings = {
+      ...siteSettings,
+      membership_open: scheduleOpen,
+      membership_term_name: scheduleTermName.trim() || 'Academic Semester Intake',
+      membership_start_date: scheduleStartDate || null,
+      membership_end_date: scheduleEndDate || null,
+      membership_closed_message:
+        scheduleClosedMessage.trim() ||
+        'Membership applications for the current academic session are currently closed. The next cohort enrollment will open at the start of the upcoming semester.',
+      updated_at: new Date().toISOString(),
+    };
+
+    try {
+      // 1. Immediate session persistence for dev & fast feedback
+      sessionStorage.setItem('sign_site_settings', JSON.stringify(updatedSettings));
+      setSiteSettings(updatedSettings);
+
+      // 2. Persist to Supabase if connected
+      if (isSupabaseConfigured) {
+        const { error } = await supabase
+          .from('site_settings')
+          .update({
+            membership_open: updatedSettings.membership_open,
+            membership_term_name: updatedSettings.membership_term_name,
+            membership_start_date: updatedSettings.membership_start_date,
+            membership_end_date: updatedSettings.membership_end_date,
+            membership_closed_message: updatedSettings.membership_closed_message,
+            updated_at: updatedSettings.updated_at,
+          })
+          .eq('id', 1);
+
+        if (error) {
+          console.warn('[SIGN Admin Applications] Supabase schedule update error:', error.message);
+        }
+      }
+
+      setScheduleSuccessMsg('Semester schedule and intake window updated successfully!');
+      setTimeout(() => {
+        setIsScheduleModalOpen(false);
+        setScheduleSuccessMsg(null);
+      }, 1000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to save schedule settings.';
+      setScheduleErrorMsg(msg);
+    } finally {
+      setIsSavingSchedule(false);
+    }
+  };
 
   const DEMO_APPLICATIONS: MembershipApplication[] = [
     {
@@ -602,13 +686,14 @@ export const AdminApplicationsPage: React.FC = () => {
           </div>
         </div>
 
-        <Link
-          to="/admin/content"
-          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shrink-0"
+        <button
+          type="button"
+          onClick={openScheduleModal}
+          className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-cyan-950/70 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-700/60 transition-all shrink-0 cursor-pointer shadow-sm hover:shadow-cyan-950/50"
         >
           <Sliders className="w-3.5 h-3.5 text-cyan-400" />
           Adjust Semester Schedule &rarr;
-        </Link>
+        </button>
       </div>
 
       {/* Storage Control & Retention Management Toolbar */}
@@ -1070,6 +1155,228 @@ export const AdminApplicationsPage: React.FC = () => {
                 Close (Esc)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Semester Schedule & Intake Control Modal */}
+      {isScheduleModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => !isSavingSchedule && setIsScheduleModalOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-800 rounded-3xl max-w-xl w-full p-6 sm:p-8 space-y-6 shadow-2xl relative max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+                  <Sliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-white tracking-tight">
+                    Academic Intake & Semester Schedule
+                  </h2>
+                  <p className="text-xs text-slate-400">
+                    Control membership window timing, semester cohort, and enrollment notices.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsScheduleModalOpen(false)}
+                disabled={isSavingSchedule}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Live Evaluation Preview Banner */}
+            {(() => {
+              const previewEval = evaluateMembershipIntake({
+                ...siteSettings,
+                membership_open: scheduleOpen,
+                membership_term_name: scheduleTermName,
+                membership_start_date: scheduleStartDate,
+                membership_end_date: scheduleEndDate,
+                membership_closed_message: scheduleClosedMessage,
+              });
+
+              return (
+                <div
+                  className={`p-3.5 rounded-2xl border text-xs flex items-center justify-between gap-3 ${
+                    previewEval.isOpen
+                      ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-300'
+                      : 'bg-amber-950/40 border-amber-800/60 text-amber-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${
+                        previewEval.isOpen ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                      }`}
+                    />
+                    <div>
+                      <span className="font-bold block">{previewEval.badgeText}</span>
+                      <span className="text-[11px] opacity-80">{previewEval.headline}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-black/30 border border-white/10 shrink-0">
+                    Live Status Preview
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Form */}
+            <form onSubmit={handleSaveSchedule} className="space-y-4">
+              {/* Master Intake Toggle */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-sm font-bold text-white block">
+                    Membership Intake Status
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    Toggle whether the chapter is currently accepting new applicant submissions.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setScheduleOpen(!scheduleOpen)}
+                  className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                    scheduleOpen ? 'bg-emerald-600' : 'bg-slate-700'
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      scheduleOpen ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* Academic Term Name */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs">
+                  Academic Semester / Cohort Name <span className="text-cyan-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={scheduleTermName}
+                  onChange={(e) => setScheduleTermName(e.target.value)}
+                  placeholder="e.g. Fall 2026 Semester Intake or Spring 2027 Cohort"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500"
+                />
+              </div>
+
+              {/* Start & End Dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                    Intake Window Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleStartDate}
+                    onChange={(e) => setScheduleStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-cyan-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    Optional start of semester enrollment
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 text-xs flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                    Official Application Deadline
+                  </label>
+                  <input
+                    type="date"
+                    value={scheduleEndDate}
+                    onChange={(e) => setScheduleEndDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-cyan-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-0.5 block">
+                    Intake auto-closes at 23:59 on this date
+                  </span>
+                </div>
+              </div>
+
+              {/* Closed Notice Message */}
+              <div>
+                <label className="block text-slate-300 font-semibold mb-1 text-xs">
+                  Institutional Notice for Closed Period
+                </label>
+                <textarea
+                  rows={3}
+                  value={scheduleClosedMessage}
+                  onChange={(e) => setScheduleClosedMessage(e.target.value)}
+                  placeholder="Explanation shown to students when applications are closed..."
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-cyan-500"
+                />
+              </div>
+
+              {/* Success / Error Feedback */}
+              {scheduleSuccessMsg && (
+                <div className="p-3 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>{scheduleSuccessMsg}</span>
+                </div>
+              )}
+
+              {scheduleErrorMsg && (
+                <div className="p-3 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                  <span>{scheduleErrorMsg}</span>
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-800">
+                <Link
+                  to="/admin/settings?tab=settings"
+                  className="text-xs text-slate-400 hover:text-cyan-300 inline-flex items-center gap-1.5 transition-colors order-2 sm:order-1"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  Full Content & Settings Page
+                </Link>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto order-1 sm:order-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsScheduleModalOpen(false)}
+                    disabled={isSavingSchedule}
+                    className="flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingSchedule}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-5 py-2 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-teal-300 hover:from-cyan-300 hover:to-teal-200 transition-all shadow-md shadow-cyan-950/40 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSavingSchedule ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Saving Schedule...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-3.5 h-3.5" />
+                        Save Schedule
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

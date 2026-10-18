@@ -81,6 +81,14 @@ export const App: React.FC = () => {
                 </AdminRoute>
               }
             />
+            <Route
+              path="content"
+              element={
+                <AdminRoute allowedRoles={['website_admin', 'super_admin']}>
+                  <AdminContentSettingsPage />
+                </AdminRoute>
+              }
+            />
 
             {/* Super Admin Strictly Isolated */}
             <Route

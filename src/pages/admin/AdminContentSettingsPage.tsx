@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { SiteContent } from '../../types/database.types';
 import { OFFICIAL_SETTINGS, OFFICIAL_CONTENT } from '../../data/fallback-content';
@@ -22,7 +23,22 @@ import {
 
 export const AdminContentSettingsPage: React.FC = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<'content' | 'settings'>('content');
+  const [searchParams] = useSearchParams();
+  const initialTab =
+    searchParams.get('tab') === 'settings' || searchParams.get('tab') === 'schedule'
+      ? 'settings'
+      : 'content';
+  const [activeTab, setActiveTab] = useState<'content' | 'settings'>(initialTab);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'settings' || tab === 'schedule') {
+      setActiveTab('settings');
+    } else if (tab === 'content') {
+      setActiveTab('content');
+    }
+  }, [searchParams]);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
