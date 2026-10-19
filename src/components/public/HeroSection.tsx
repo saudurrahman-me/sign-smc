@@ -1,8 +1,37 @@
-import React, { useEffect, useRef } from 'react';
-import { ArrowRight, Calendar, BookOpen } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ArrowRight, Calendar, BookOpen, Clock } from 'lucide-react';
+import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
+import { evaluateMembershipIntake } from '../../lib/membership-schedule';
+import type { SiteSettings } from '../../types/database.types';
 
 export const HeroSection: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
+
+  useEffect(() => {
+    try {
+      const cached =
+        localStorage.getItem('sign_site_settings') ||
+        sessionStorage.getItem('sign_site_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed) setSiteSettings((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
+
+    const handleSettingsUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<SiteSettings>;
+      if (customEvent.detail) {
+        setSiteSettings((prev) => ({ ...prev, ...customEvent.detail }));
+      }
+    };
+    window.addEventListener('sign_settings_updated', handleSettingsUpdated);
+    return () => window.removeEventListener('sign_settings_updated', handleSettingsUpdated);
+  }, []);
+
+  const intakeEval = evaluateMembershipIntake(siteSettings);
 
   // Subtle interactive neural canvas network animation
   useEffect(() => {
@@ -169,10 +198,15 @@ export const HeroSection: React.FC = () => {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="#membership"
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-lg shadow-emerald-950/20 border border-emerald-400/30 transition-all transform hover:-translate-y-0.5"
+            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-xl text-sm font-bold transition-all transform hover:-translate-y-0.5 ${
+              intakeEval.isOpen
+                ? 'text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-lg shadow-emerald-950/20 border border-emerald-400/30'
+                : 'text-amber-300 bg-amber-950/80 hover:bg-amber-900 border border-amber-600/40 shadow-xs'
+            }`}
           >
-            Apply for Membership
-            <ArrowRight className="w-4 h-4" />
+            {!intakeEval.isOpen && <Clock className="w-4 h-4 text-amber-400" />}
+            <span>{intakeEval.isOpen ? 'Apply for Membership' : intakeEval.badgeText}</span>
+            {intakeEval.isOpen && <ArrowRight className="w-4 h-4" />}
           </a>
 
           <a

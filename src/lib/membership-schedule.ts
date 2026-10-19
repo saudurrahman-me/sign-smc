@@ -14,6 +14,7 @@ export interface IntakeEvaluation {
   startDate: string | null;
   endDate: string | null;
   daysRemaining: number | null;
+  durationText?: string | null;
 }
 
 /**
@@ -35,16 +36,43 @@ export function evaluateMembershipIntake(
 
   // 1. Explicitly toggled OFF by admin
   if (!isExplicitlyOpen) {
+    let durationText: string | null = null;
+    let badgeText = 'Intake Closed';
+
+    if (startDateStr) {
+      const startDate = new Date(startDateStr);
+      if (!isNaN(startDate.getTime()) && now < startDate) {
+        const formattedStart = startDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+        durationText = `Opens ${formattedStart}`;
+        badgeText = `Opens ${formattedStart}`;
+      }
+    }
+
+    if (!durationText && endDateStr) {
+      const formattedEnd = new Date(endDateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      durationText = `Closed on ${formattedEnd}`;
+      badgeText = `Closed • ${formattedEnd}`;
+    }
+
     return {
       isOpen: false,
       status: 'closed',
-      badgeText: 'Intake Closed',
+      badgeText,
       headline: `Applications Closed for ${termName}`,
       message: closedMessage,
       termName,
       startDate: startDateStr,
       endDate: endDateStr,
       daysRemaining: null,
+      durationText,
     };
   }
 

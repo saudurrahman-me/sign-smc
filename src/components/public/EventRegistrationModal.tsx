@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useOptionalAuth } from '../../context/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import type { EventItem, EventRegistration } from '../../types/database.types';
+import type { EventItem, EventRegistration, SiteSettings } from '../../types/database.types';
+import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
+import { evaluateEventRegistration } from '../../lib/event-registration-schedule';
 import {
   compressPaymentReceipt,
   formatBytes,
@@ -30,6 +32,7 @@ import {
   MessageCircle,
   Mail,
   Users,
+  Lock,
 } from 'lucide-react';
 
 interface EventRegistrationModalProps {
@@ -76,6 +79,23 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [confirmedReg, setConfirmedReg] = useState<EventRegistration | null>(null);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
+
+  useEffect(() => {
+    try {
+      const cached =
+        localStorage.getItem('sign_site_settings') ||
+        sessionStorage.getItem('sign_site_settings');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed) setSiteSettings((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch {
+      // ignore
+    }
+  }, [isOpen]);
+
+  const regSchedule = evaluateEventRegistration(event, siteSettings);
 
   // Reset or initialize form when modal opens
   useEffect(() => {
@@ -286,6 +306,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (!existingRegistration && !regSchedule.canRegister) {
+      setErrorMessage(regSchedule.message);
+      return;
+    }
 
     if (isSlotsFull) {
       setErrorMessage(
@@ -775,6 +800,19 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 </div>
               </div>
 
+              {/* Event Registration Closed Notice */}
+              {!regSchedule.canRegister && (
+                <div className="p-3.5 rounded-2xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs flex items-center gap-2.5">
+                  <Lock className="w-4 h-4 text-amber-400 shrink-0" />
+                  <div>
+                    <strong className="block text-white font-semibold">Event Registration Closed</strong>
+                    <span className="text-[11px] text-amber-300/90">
+                      {regSchedule.message}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* Slots Full Notice */}
               {isSlotsFull && (
                 <div className="p-3.5 rounded-2xl bg-amber-950/70 border border-amber-500/50 text-amber-200 text-xs flex items-center gap-2.5">
@@ -1214,7 +1252,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || isSlotsFull}
+                  disabled={isSubmitting || isSlotsFull || !regSchedule.canRegister}
                   className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer shadow-md shadow-emerald-950/40 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? (
@@ -1226,6 +1264,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                     <>
                       <Users className="w-4 h-4" />
                       <span>Slots Full (Closed)</span>
+                    </>
+                  ) : !regSchedule.canRegister ? (
+                    <>
+                      <Lock className="w-4 h-4" />
+                      <span>{regSchedule.buttonText}</span>
                     </>
                   ) : (
                     <>

@@ -39,6 +39,7 @@ import {
   CreditCard,
   Tag,
   ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import { APP_VERSION } from '../../config/version';
 
@@ -100,6 +101,8 @@ export const AdminEventsPage: React.FC = () => {
 
   const [registrationUrl, setRegistrationUrl] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
+  const [registrationDeadline, setRegistrationDeadline] = useState('');
 
   const [formError, setFormError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -532,6 +535,9 @@ export const AdminEventsPage: React.FC = () => {
       'If you face any issues while transferring the registration fee, deduction errors, or bank delays, please contact our Chapter Finance Officer or official channels for immediate assistance:'
     );
 
+    setIsRegistrationOpen(true);
+    setRegistrationDeadline('');
+
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -552,6 +558,8 @@ export const AdminEventsPage: React.FC = () => {
     setShowUrlInput(false);
     setRegistrationUrl(ev.registration_url || '');
     setIsPublished(ev.is_published);
+    setIsRegistrationOpen(ev.is_registration_open ?? true);
+    setRegistrationDeadline(ev.registration_deadline || '');
 
     // Initialize payment & support fields
     setIsPaid(Boolean(ev.is_paid));
@@ -676,6 +684,10 @@ export const AdminEventsPage: React.FC = () => {
         support_phone: supportPhone.trim() || null,
         support_email: supportEmail.trim() || null,
         support_instructions: supportInstructions.trim() || null,
+
+        // Registration Status & Deadline Controls
+        is_registration_open: isRegistrationOpen,
+        registration_deadline: registrationDeadline ? registrationDeadline : null,
       };
 
       const basicPayload = {
@@ -715,7 +727,9 @@ export const AdminEventsPage: React.FC = () => {
           message.includes('max_attendees') ||
           message.includes('support_phone') ||
           message.includes('support_email') ||
-          message.includes('support_instructions')
+          message.includes('support_instructions') ||
+          message.includes('is_registration_open') ||
+          message.includes('registration_deadline')
         );
       };
 
@@ -963,6 +977,7 @@ export const AdminEventsPage: React.FC = () => {
                   <th className="py-3.5 px-4">Date & Time</th>
                   <th className="py-3.5 px-4">Venue</th>
                   <th className="py-3.5 px-4 text-center">Registrations</th>
+                  <th className="py-3.5 px-4 text-center">Reg Status</th>
                   <th className="py-3.5 px-4 text-center">Status</th>
                   <th className="py-3.5 px-4 text-right">Actions</th>
                 </tr>
@@ -1048,6 +1063,23 @@ export const AdminEventsPage: React.FC = () => {
                           {ev.max_attendees ? 'Slots' : 'Registered'}
                         </span>
                       </button>
+                    </td>
+                    <td className="py-4 px-4 text-center whitespace-nowrap">
+                      {ev.is_registration_open === false ? (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                          <Lock className="w-2.5 h-2.5 text-rose-400" />
+                          Closed
+                        </span>
+                      ) : ev.registration_deadline ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800 font-mono">
+                          <Clock className="w-2.5 h-2.5 text-amber-400" />
+                          {ev.registration_deadline}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                          Open
+                        </span>
+                      )}
                     </td>
                     <td className="py-4 px-4 text-center whitespace-nowrap">
                       <button
@@ -1590,6 +1622,58 @@ export const AdminEventsPage: React.FC = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Event Registration Status & Deadline Controls */}
+              <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Ticket className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-white text-xs uppercase tracking-wider">
+                      Event Registration Availability & Deadline
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsRegistrationOpen(true)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        isRegistrationOpen
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Registration Open
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsRegistrationOpen(false)}
+                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                        !isRegistrationOpen
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'bg-slate-900 text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Registration Closed
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1 text-[11px] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Event Registration Deadline / Close Date (Optional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={registrationDeadline}
+                    onChange={(e) => setRegistrationDeadline(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white focus:border-teal-500"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    If specified, attendees see the countdown duration (e.g. "X Days Left"). After 23:59 on this date, registration automatically closes.
+                  </span>
+                </div>
               </div>
 
               {/* Registration Link */}
