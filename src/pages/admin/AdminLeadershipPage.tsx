@@ -19,7 +19,16 @@ import {
   Upload,
   Loader2,
   Link as LinkIcon,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
+import {
+  resequenceLeadershipProfiles,
+  normalizeProfileOrders,
+  moveProfileUp,
+  moveProfileDown,
+  isValidUuid,
+} from '../../lib/leadership-reorder';
 
 export const AdminLeadershipPage: React.FC = () => {
   const { user } = useAuth();
@@ -115,6 +124,36 @@ export const AdminLeadershipPage: React.FC = () => {
     }
   };
 
+  const syncProfilesOrderToSupabase = async (updatedList: LeadershipProfile[]) => {
+    if (isDevSession || !isSupabaseConfigured) return;
+
+    for (const p of updatedList) {
+      try {
+        if (isValidUuid(p.id)) {
+          await supabase
+            .from('leadership_profiles')
+            .update({ display_order: p.display_order, updated_at: new Date().toISOString() })
+            .eq('id', p.id);
+        } else {
+          // Placeholder profile without UUID: check if exists in DB by full_name
+          const { data: dbMatch } = await supabase
+            .from('leadership_profiles')
+            .select('id')
+            .ilike('full_name', p.full_name.trim())
+            .maybeSingle();
+          if (dbMatch?.id) {
+            await supabase
+              .from('leadership_profiles')
+              .update({ display_order: p.display_order, updated_at: new Date().toISOString() })
+              .eq('id', dbMatch.id);
+          }
+        }
+      } catch (err) {
+        console.warn('[SIGN Admin Leadership] Order sync warning for', p.full_name, err);
+      }
+    }
+  };
+
   const fetchProfiles = async () => {
     setIsLoading(true);
     if (isDevSession) {
@@ -122,16 +161,15 @@ export const AdminLeadershipPage: React.FC = () => {
         const stored = sessionStorage.getItem('sign_dev_leadership_profiles');
         if (stored) {
           const parsed = JSON.parse(stored) as LeadershipProfile[];
-          const existingNames = new Set(parsed.map((p) => p.full_name.toLowerCase()));
+          const existingNames = new Set(parsed.map((p) => p.full_name.trim().toLowerCase()));
           const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
-            (init) => !existingNames.has(init.full_name.toLowerCase())
+            (init) => !existingNames.has(init.full_name.trim().toLowerCase())
           );
           const combined = [...parsed, ...missingDefaults].map((p) => {
             const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) =>
                 f.id === p.id ||
-                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
-                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+                f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
             );
             if (match) {
               const orderNum = Number(p.display_order);
@@ -148,7 +186,8 @@ export const AdminLeadershipPage: React.FC = () => {
             }
             return p;
           });
-          setProfiles(combined.sort((a, b) => a.display_order - b.display_order));
+          const normalized = normalizeProfileOrders(combined);
+          setProfiles(normalized);
           setIsLoading(false);
           return;
         }
@@ -158,7 +197,7 @@ export const AdminLeadershipPage: React.FC = () => {
     }
 
     if (!isSupabaseConfigured) {
-      setProfiles(INITIAL_LEADERSHIP_PLACEHOLDERS);
+      setProfiles(normalizeProfileOrders(INITIAL_LEADERSHIP_PLACEHOLDERS));
       setIsLoading(false);
       return;
     }
@@ -172,9 +211,9 @@ export const AdminLeadershipPage: React.FC = () => {
         console.error('[SIGN Admin Leadership] Error:', error.message);
       } else if (data) {
         const fetched = data as LeadershipProfile[];
-        const existingNames = new Set(fetched.map((p) => p.full_name.toLowerCase()));
+        const existingNames = new Set(fetched.map((p) => p.full_name.trim().toLowerCase()));
         const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
-          (init) => !existingNames.has(init.full_name.toLowerCase())
+          (init) => !existingNames.has(init.full_name.trim().toLowerCase())
         );
         const combined = [...fetched, ...missingDefaults];
 
@@ -182,8 +221,7 @@ export const AdminLeadershipPage: React.FC = () => {
           const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
             (f) =>
               f.id === p.id ||
-              f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
-              (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+              f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
           );
           if (fallbackMatch) {
             const orderNum = Number(p.display_order);
@@ -208,7 +246,8 @@ export const AdminLeadershipPage: React.FC = () => {
           }
           return p;
         });
-        setProfiles(merged.sort((a, b) => a.display_order - b.display_order));
+        const normalized = normalizeProfileOrders(merged);
+        setProfiles(normalized);
       }
     } catch (err) {
       console.error('[SIGN Admin Leadership] Unexpected error:', err);
@@ -275,6 +314,8 @@ export const AdminLeadershipPage: React.FC = () => {
       if (twitter.trim()) socialLinks.twitter = twitter.trim();
       if (researchgate.trim()) socialLinks.researchgate = researchgate.trim();
 
+      const targetOrder = Math.max(1, Number(displayOrder) || 1);
+
       const payload = {
         full_name: fullName.trim(),
         role_title: roleTitle.trim(),
@@ -283,70 +324,111 @@ export const AdminLeadershipPage: React.FC = () => {
         photo_url: photoUrl.trim() || null,
         contact_email: contactEmail.trim() || null,
         social_links: socialLinks,
-        display_order: Number(displayOrder),
+        display_order: targetOrder,
         is_published: isPublished,
         updated_at: new Date().toISOString(),
       };
 
-      if (isDevSession) {
-        let updatedList: LeadershipProfile[];
-        if (editingProfile) {
-          updatedList = profiles.map((item) =>
-            item.id === editingProfile.id
-              ? { ...item, ...payload, photo_url: payload.photo_url || item.photo_url }
-              : item
-          );
-        } else {
-          const newEntry: LeadershipProfile = {
-            id: `dev-lead-${Date.now()}`,
-            ...payload,
-            photo_url:
-              payload.photo_url ||
-              'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
-            created_at: new Date().toISOString(),
-          };
-          updatedList = [...profiles, newEntry];
-        }
-        setProfiles(updatedList);
-        try {
-          sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
-        } catch {
-          // ignore
-        }
-        setIsModalOpen(false);
-        return;
-      }
+      let reorderedList: LeadershipProfile[];
 
       if (editingProfile) {
-        const { data, error } = await supabase
-          .from('leadership_profiles')
-          .update(payload)
-          .eq('id', editingProfile.id)
-          .select();
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error(
-            'Database permission denied: Supabase RLS blocked the update. Check that your user account has website_admin or super_admin permissions.'
-          );
-        }
+        const updatedTarget: LeadershipProfile = {
+          ...editingProfile,
+          ...payload,
+          photo_url: payload.photo_url || editingProfile.photo_url,
+        };
+        const listWithTarget = profiles.map((item) =>
+          item.id === editingProfile.id ? updatedTarget : item
+        );
+        reorderedList = resequenceLeadershipProfiles(listWithTarget, editingProfile.id, targetOrder);
       } else {
-        const { data, error } = await supabase.from('leadership_profiles').insert(payload).select();
-        if (error) throw error;
-        if (!data || data.length === 0) {
-          throw new Error(
-            'Database permission denied: Supabase RLS blocked the insertion. Check that your user account has website_admin or super_admin permissions.'
-          );
+        const newEntry: LeadershipProfile = {
+          id: `dev-lead-${Date.now()}`,
+          ...payload,
+          photo_url:
+            payload.photo_url ||
+            'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
+          created_at: new Date().toISOString(),
+        };
+        const listWithNew = [...profiles, newEntry];
+        reorderedList = resequenceLeadershipProfiles(listWithNew, newEntry.id, targetOrder);
+      }
+
+      setProfiles(reorderedList);
+      try {
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reorderedList));
+      } catch {
+        // ignore
+      }
+
+      if (!isDevSession && isSupabaseConfigured) {
+        if (editingProfile) {
+          if (isValidUuid(editingProfile.id)) {
+            const { error } = await supabase
+              .from('leadership_profiles')
+              .update(payload)
+              .eq('id', editingProfile.id);
+            if (error) throw error;
+          } else {
+            // Placeholder without UUID: check if exists in DB by full_name
+            const { data: existing } = await supabase
+              .from('leadership_profiles')
+              .select('id')
+              .ilike('full_name', payload.full_name)
+              .maybeSingle();
+
+            if (existing?.id) {
+              const { error } = await supabase
+                .from('leadership_profiles')
+                .update(payload)
+                .eq('id', existing.id);
+              if (error) throw error;
+            } else {
+              const { error } = await supabase
+                .from('leadership_profiles')
+                .insert(payload);
+              if (error) throw error;
+            }
+          }
+        } else {
+          const { error } = await supabase.from('leadership_profiles').insert(payload);
+          if (error) throw error;
         }
+
+        // Sync reordered ranks across all profiles in database
+        await syncProfilesOrderToSupabase(reorderedList);
+        await fetchProfiles();
       }
 
       setIsModalOpen(false);
-      await fetchProfiles();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error saving profile';
       setFormError(msg);
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleMoveUp = async (person: LeadershipProfile) => {
+    const reordered = moveProfileUp(profiles, person.id);
+    setProfiles(reordered);
+    try {
+      sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+    } catch {
+      // ignore
+    }
+    await syncProfilesOrderToSupabase(reordered);
+  };
+
+  const handleMoveDown = async (person: LeadershipProfile) => {
+    const reordered = moveProfileDown(profiles, person.id);
+    setProfiles(reordered);
+    try {
+      sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+    } catch {
+      // ignore
+    }
+    await syncProfilesOrderToSupabase(reordered);
   };
 
   const togglePublish = async (p: LeadershipProfile) => {
@@ -363,15 +445,17 @@ export const AdminLeadershipPage: React.FC = () => {
       return;
     }
     try {
-      const { data, error } = await supabase
-        .from('leadership_profiles')
-        .update({ is_published: !p.is_published, updated_at: new Date().toISOString() })
-        .eq('id', p.id)
-        .select();
+      if (isValidUuid(p.id)) {
+        const { data, error } = await supabase
+          .from('leadership_profiles')
+          .update({ is_published: !p.is_published, updated_at: new Date().toISOString() })
+          .eq('id', p.id)
+          .select();
 
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Permission denied: Supabase RLS blocked the update.');
+        if (error) throw error;
+        if (!data || data.length === 0) {
+          throw new Error('Permission denied: Supabase RLS blocked the update.');
+        }
       }
       setProfiles(
         profiles.map((item) => (item.id === p.id ? { ...item, is_published: !p.is_published } : item))
@@ -384,26 +468,34 @@ export const AdminLeadershipPage: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this profile?')) return;
-    if (isDevSession) {
-      const updatedList = profiles.filter((p) => p.id !== id);
-      setProfiles(updatedList);
-      try {
-        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
-      } catch {
-        // ignore
-      }
-      return;
-    }
+    const remaining = profiles.filter((p) => p.id !== id);
+    const normalized = normalizeProfileOrders(remaining);
+    setProfiles(normalized);
     try {
-      const { data, error } = await supabase.from('leadership_profiles').delete().eq('id', id).select();
-      if (error) throw error;
-      if (!data || data.length === 0) {
-        throw new Error('Permission denied: Supabase RLS blocked the deletion.');
+      sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(normalized));
+    } catch {
+      // ignore
+    }
+
+    if (!isDevSession && isSupabaseConfigured) {
+      try {
+        if (isValidUuid(id)) {
+          await supabase.from('leadership_profiles').delete().eq('id', id);
+        } else {
+          const delProfile = profiles.find((p) => p.id === id);
+          if (delProfile) {
+            await supabase
+              .from('leadership_profiles')
+              .delete()
+              .ilike('full_name', delProfile.full_name);
+          }
+        }
+        await syncProfilesOrderToSupabase(normalized);
+        await fetchProfiles();
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Error deleting profile';
+        alert(msg);
       }
-      setProfiles(profiles.filter((p) => p.id !== id));
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Error deleting profile';
-      alert(msg);
     }
   };
 
@@ -539,6 +631,26 @@ export const AdminLeadershipPage: React.FC = () => {
 
                 <div className="flex items-center gap-1">
                   <button
+                    type="button"
+                    onClick={() => handleMoveUp(person)}
+                    disabled={person.display_order <= 1}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    title={`Move Up (currently #${person.display_order})`}
+                    aria-label={`Move ${person.full_name} Up`}
+                  >
+                    <ArrowUp className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleMoveDown(person)}
+                    disabled={person.display_order >= profiles.length}
+                    className="p-1.5 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    title={`Move Down (currently #${person.display_order})`}
+                    aria-label={`Move ${person.full_name} Down`}
+                  >
+                    <ArrowDown className="w-4 h-4" />
+                  </button>
+                  <button
                     onClick={() => openEditModal(person)}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
                     title="Edit Profile"
@@ -648,10 +760,14 @@ export const AdminLeadershipPage: React.FC = () => {
                   <input
                     type="number"
                     min="1"
+                    max={Math.max(profiles.length, 1)}
                     value={displayOrder}
                     onChange={(e) => setDisplayOrder(parseInt(e.target.value) || 1)}
                     className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white focus:border-teal-500"
                   />
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Setting any rank (e.g. #8) automatically shifts other members so there are never duplicate order collisions.
+                  </p>
                 </div>
               </div>
 

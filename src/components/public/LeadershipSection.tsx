@@ -4,6 +4,7 @@ import { LinkedinIcon, TwitterIcon } from '../brand/SocialIcons';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import type { LeadershipProfile } from '../../types/database.types';
 import { INITIAL_LEADERSHIP_PLACEHOLDERS } from '../../data/fallback-content';
+import { normalizeProfileOrders } from '../../lib/leadership-reorder';
 
 export const LeadershipSection: React.FC = () => {
   const [profiles, setProfiles] = useState<LeadershipProfile[]>(INITIAL_LEADERSHIP_PLACEHOLDERS);
@@ -17,16 +18,15 @@ export const LeadershipSection: React.FC = () => {
         if (devCached) {
           const parsed = JSON.parse(devCached) as LeadershipProfile[];
           const published = parsed.filter((p) => p.is_published);
-          const existingNames = new Set(published.map((p) => p.full_name.toLowerCase()));
+          const existingNames = new Set(published.map((p) => p.full_name.trim().toLowerCase()));
           const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
-            (init) => !existingNames.has(init.full_name.toLowerCase())
+            (init) => !existingNames.has(init.full_name.trim().toLowerCase())
           );
           const combined = [...published, ...missingDefaults].map((p) => {
             const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) =>
                 f.id === p.id ||
-                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
-                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+                f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
             );
             if (match) {
               const orderNum = Number(p.display_order);
@@ -43,8 +43,9 @@ export const LeadershipSection: React.FC = () => {
             }
             return p;
           });
-          if (combined.length > 0 && isMounted) {
-            setProfiles(combined.sort((a, b) => a.display_order - b.display_order));
+          const normalized = normalizeProfileOrders(combined);
+          if (normalized.length > 0 && isMounted) {
+            setProfiles(normalized);
             setIsLoading(false);
             return;
           }
@@ -68,9 +69,9 @@ export const LeadershipSection: React.FC = () => {
           console.error('[SIGN Leadership] Error fetching profiles:', error.message);
         } else if (data && data.length > 0 && isMounted) {
           const fetched = data as LeadershipProfile[];
-          const existingNames = new Set(fetched.map((p) => p.full_name.toLowerCase()));
+          const existingNames = new Set(fetched.map((p) => p.full_name.trim().toLowerCase()));
           const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
-            (init) => !existingNames.has(init.full_name.toLowerCase())
+            (init) => !existingNames.has(init.full_name.trim().toLowerCase())
           );
           const combined = [...fetched, ...missingDefaults];
 
@@ -78,8 +79,7 @@ export const LeadershipSection: React.FC = () => {
             const fallbackMatch = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
               (f) =>
                 f.id === p.id ||
-                f.full_name.toLowerCase() === p.full_name.toLowerCase() ||
-                (p.full_name.toLowerCase().includes('eshaal') && f.full_name.toLowerCase().includes('eshaal'))
+                f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
             );
             if (fallbackMatch) {
               const orderNum = Number(p.display_order);
@@ -103,7 +103,8 @@ export const LeadershipSection: React.FC = () => {
             }
             return p;
           });
-          setProfiles(merged.sort((a, b) => a.display_order - b.display_order));
+          const normalized = normalizeProfileOrders(merged);
+          setProfiles(normalized);
         }
       } catch (err) {
         console.error('[SIGN Leadership] Unexpected error:', err);

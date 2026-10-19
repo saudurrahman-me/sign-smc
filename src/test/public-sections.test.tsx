@@ -111,6 +111,30 @@ describe('Public Website Academic Sections', () => {
     expect(amjadPos).toBeLessThan(fawadPos);
   });
 
+  it('correctly renders member assigned to rank 8 before member shifted to rank 9', () => {
+    // Specifically test moving Hadia (#9) to rank #8 and shifting Eshaal to rank #9
+    const customProfiles = INITIAL_LEADERSHIP_PLACEHOLDERS.map((p) => {
+      if (p.full_name.includes('Hadia')) {
+        return { ...p, display_order: 8 };
+      }
+      if (p.full_name.includes('Eshaal')) {
+        return { ...p, display_order: 9 };
+      }
+      return p;
+    });
+    sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(customProfiles));
+
+    const { container } = render(<LeadershipSection />);
+    const textContent = container.textContent || '';
+    const hadiaPos = textContent.indexOf('Hadia Zahoor');
+    const eshaalPos = textContent.indexOf('Eshaal Khan');
+
+    expect(hadiaPos).toBeGreaterThan(-1);
+    expect(eshaalPos).toBeGreaterThan(-1);
+    // Hadia (rank 8) must appear before Eshaal (rank 9)
+    expect(hadiaPos).toBeLessThan(eshaalPos);
+  });
+
   it('renders events section with clean empty state when no upcoming events exist', () => {
     render(<EventsSection />);
     expect(screen.getByText(/Events & Academic Activities/i)).toBeInTheDocument();
