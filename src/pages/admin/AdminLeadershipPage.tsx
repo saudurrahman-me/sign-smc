@@ -34,6 +34,7 @@ export const AdminLeadershipPage: React.FC = () => {
   const { user } = useAuth();
   const [profiles, setProfiles] = useState<LeadershipProfile[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isReordering, setIsReordering] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   // Modal State
@@ -125,27 +126,58 @@ export const AdminLeadershipPage: React.FC = () => {
   };
 
   const syncProfilesOrderToSupabase = async (updatedList: LeadershipProfile[]) => {
-    if (isDevSession || !isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) return;
 
     for (const p of updatedList) {
       try {
         if (isValidUuid(p.id)) {
-          await supabase
+          const { error } = await supabase
             .from('leadership_profiles')
             .update({ display_order: p.display_order, updated_at: new Date().toISOString() })
             .eq('id', p.id);
+          if (error) {
+            console.warn('[SIGN Admin Leadership] Order update warning for', p.full_name, error.message);
+          }
         } else {
           // Placeholder profile without UUID: check if exists in DB by full_name
-          const { data: dbMatch } = await supabase
+          const { data: dbMatch, error: matchError } = await supabase
             .from('leadership_profiles')
             .select('id')
             .ilike('full_name', p.full_name.trim())
             .maybeSingle();
-          if (dbMatch?.id) {
+
+          if (!matchError && dbMatch?.id) {
             await supabase
               .from('leadership_profiles')
               .update({ display_order: p.display_order, updated_at: new Date().toISOString() })
               .eq('id', dbMatch.id);
+            p.id = dbMatch.id;
+          } else {
+            // Profile is not yet in Supabase: INSERT it so its position is permanently saved in the database!
+            const payload = {
+              full_name: p.full_name.trim(),
+              role_title: p.role_title.trim(),
+              bio: p.bio || null,
+              academic_year: p.academic_year || null,
+              photo_url: p.photo_url || null,
+              contact_email: p.contact_email || null,
+              social_links: p.social_links || {},
+              display_order: p.display_order,
+              is_published: typeof p.is_published === 'boolean' ? p.is_published : true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            };
+            const { data: inserted, error: insertError } = await supabase
+              .from('leadership_profiles')
+              .insert(payload)
+              .select('id')
+              .single();
+
+            if (!insertError && inserted?.id) {
+              p.id = inserted.id;
+            } else if (insertError) {
+              console.warn('[SIGN Admin Leadership] Insert sync notice for', p.full_name, insertError.message);
+            }
           }
         }
       } catch (err) {
@@ -156,51 +188,57 @@ export const AdminLeadershipPage: React.FC = () => {
 
   const fetchProfiles = async () => {
     setIsLoading(true);
-    if (isDevSession) {
-      try {
-        const stored = sessionStorage.getItem('sign_dev_leadership_profiles');
-        if (stored) {
-          const parsed = JSON.parse(stored) as LeadershipProfile[];
-          const existingNames = new Set(parsed.map((p) => p.full_name.trim().toLowerCase()));
-          const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
-            (init) => !existingNames.has(init.full_name.trim().toLowerCase())
-          );
-          const combined = [...parsed, ...missingDefaults].map((p) => {
-            const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
-              (f) =>
-                f.id === p.id ||
-                f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
-            );
-            if (match) {
-              const orderNum = Number(p.display_order);
-              return {
-                ...p,
-                display_order:
-                  typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
-                    ? orderNum
-                    : match.display_order,
-                bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
-                academic_year: p.academic_year || match.academic_year,
-                photo_url: p.photo_url || match.photo_url,
-              };
-            }
-            return p;
-          });
-          const normalized = normalizeProfileOrders(combined);
-          setProfiles(normalized);
-          setIsLoading(false);
-          return;
-        }
-      } catch {
-        // ignore
+
+    let cachedList: LeadershipProfile[] | null = null;
+    try {
+      const stored =
+        localStorage.getItem('sign_dev_leadership_profiles') ||
+        sessionStorage.getItem('sign_dev_leadership_profiles');
+      if (stored) {
+        cachedList = JSON.parse(stored) as LeadershipProfile[];
       }
+    } catch {
+      // ignore
     }
 
-    if (!isSupabaseConfigured) {
+    if (isDevSession || !isSupabaseConfigured) {
+      if (cachedList && cachedList.length > 0) {
+        const existingNames = new Set(cachedList.map((p) => p.full_name.trim().toLowerCase()));
+        const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
+          (init) => !existingNames.has(init.full_name.trim().toLowerCase())
+        );
+        const combined = [...cachedList, ...missingDefaults].map((p) => {
+          const match = INITIAL_LEADERSHIP_PLACEHOLDERS.find(
+            (f) =>
+              f.id === p.id ||
+              f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
+          );
+          if (match) {
+            const orderNum = Number(p.display_order);
+            return {
+              ...p,
+              display_order:
+                typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                  ? orderNum
+                  : match.display_order,
+              bio: p.bio && p.bio.trim().length > 15 ? p.bio : match.bio,
+              academic_year: p.academic_year || match.academic_year,
+              photo_url: p.photo_url || match.photo_url,
+            };
+          }
+          return p;
+        });
+        const normalized = normalizeProfileOrders(combined);
+        setProfiles(normalized);
+        setIsLoading(false);
+        return;
+      }
+
       setProfiles(normalizeProfileOrders(INITIAL_LEADERSHIP_PLACEHOLDERS));
       setIsLoading(false);
       return;
     }
+
     try {
       const { data, error } = await supabase
         .from('leadership_profiles')
@@ -209,6 +247,9 @@ export const AdminLeadershipPage: React.FC = () => {
 
       if (error) {
         console.error('[SIGN Admin Leadership] Error:', error.message);
+        if (cachedList && cachedList.length > 0) {
+          setProfiles(normalizeProfileOrders(cachedList));
+        }
       } else if (data) {
         const fetched = data as LeadershipProfile[];
         const existingNames = new Set(fetched.map((p) => p.full_name.trim().toLowerCase()));
@@ -224,13 +265,23 @@ export const AdminLeadershipPage: React.FC = () => {
               f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
           );
           if (fallbackMatch) {
+            const cachedMatch = cachedList?.find(
+              (c) =>
+                c.id === p.id ||
+                c.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
+            );
+            const cachedOrder = cachedMatch ? Number(cachedMatch.display_order) : NaN;
             const orderNum = Number(p.display_order);
+            const resolvedOrder =
+              typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                ? orderNum
+                : !isNaN(cachedOrder)
+                ? cachedOrder
+                : fallbackMatch.display_order;
+
             return {
               ...p,
-              display_order:
-                typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
-                  ? orderNum
-                  : fallbackMatch.display_order,
+              display_order: resolvedOrder,
               bio:
                 p.bio &&
                 p.bio.trim().length > 15 &&
@@ -248,9 +299,18 @@ export const AdminLeadershipPage: React.FC = () => {
         });
         const normalized = normalizeProfileOrders(merged);
         setProfiles(normalized);
+        try {
+          localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(normalized));
+          sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(normalized));
+        } catch {
+          // ignore
+        }
       }
     } catch (err) {
       console.error('[SIGN Admin Leadership] Unexpected error:', err);
+      if (cachedList && cachedList.length > 0) {
+        setProfiles(normalizeProfileOrders(cachedList));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -356,6 +416,7 @@ export const AdminLeadershipPage: React.FC = () => {
 
       setProfiles(reorderedList);
       try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reorderedList));
         sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reorderedList));
       } catch {
         // ignore
@@ -410,25 +471,55 @@ export const AdminLeadershipPage: React.FC = () => {
   };
 
   const handleMoveUp = async (person: LeadershipProfile) => {
-    const reordered = moveProfileUp(profiles, person.id);
-    setProfiles(reordered);
+    if (isReordering) return;
+    setIsReordering(true);
     try {
-      sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
-    } catch {
-      // ignore
+      const reordered = moveProfileUp(profiles, person.id);
+      setProfiles(reordered);
+      try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+      } catch {
+        // ignore
+      }
+      await syncProfilesOrderToSupabase(reordered);
+      try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+      } catch {
+        // ignore
+      }
+    } catch (err) {
+      console.error('[SIGN Admin Leadership] Move Up error:', err);
+    } finally {
+      setIsReordering(false);
     }
-    await syncProfilesOrderToSupabase(reordered);
   };
 
   const handleMoveDown = async (person: LeadershipProfile) => {
-    const reordered = moveProfileDown(profiles, person.id);
-    setProfiles(reordered);
+    if (isReordering) return;
+    setIsReordering(true);
     try {
-      sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
-    } catch {
-      // ignore
+      const reordered = moveProfileDown(profiles, person.id);
+      setProfiles(reordered);
+      try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+      } catch {
+        // ignore
+      }
+      await syncProfilesOrderToSupabase(reordered);
+      try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+      } catch {
+        // ignore
+      }
+    } catch (err) {
+      console.error('[SIGN Admin Leadership] Move Down error:', err);
+    } finally {
+      setIsReordering(false);
     }
-    await syncProfilesOrderToSupabase(reordered);
   };
 
   const togglePublish = async (p: LeadershipProfile) => {
@@ -438,6 +529,7 @@ export const AdminLeadershipPage: React.FC = () => {
       );
       setProfiles(updatedList);
       try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
         sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updatedList));
       } catch {
         // ignore
@@ -457,9 +549,16 @@ export const AdminLeadershipPage: React.FC = () => {
           throw new Error('Permission denied: Supabase RLS blocked the update.');
         }
       }
-      setProfiles(
-        profiles.map((item) => (item.id === p.id ? { ...item, is_published: !p.is_published } : item))
+      const updated = profiles.map((item) =>
+        item.id === p.id ? { ...item, is_published: !p.is_published } : item
       );
+      setProfiles(updated);
+      try {
+        localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updated));
+        sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error toggling publication';
       alert(msg);
@@ -472,6 +571,7 @@ export const AdminLeadershipPage: React.FC = () => {
     const normalized = normalizeProfileOrders(remaining);
     setProfiles(normalized);
     try {
+      localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(normalized));
       sessionStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(normalized));
     } catch {
       // ignore
@@ -633,7 +733,7 @@ export const AdminLeadershipPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleMoveUp(person)}
-                    disabled={person.display_order <= 1}
+                    disabled={person.display_order <= 1 || isReordering}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title={`Move Up (currently #${person.display_order})`}
                     aria-label={`Move ${person.full_name} Up`}
@@ -643,7 +743,7 @@ export const AdminLeadershipPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleMoveDown(person)}
-                    disabled={person.display_order >= profiles.length}
+                    disabled={person.display_order >= profiles.length || isReordering}
                     className="p-1.5 rounded-lg text-slate-400 hover:text-teal-400 hover:bg-slate-800 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                     title={`Move Down (currently #${person.display_order})`}
                     aria-label={`Move ${person.full_name} Down`}

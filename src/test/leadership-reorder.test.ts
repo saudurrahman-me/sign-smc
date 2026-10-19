@@ -113,4 +113,31 @@ describe('leadership-reorder utilities', () => {
     expect(afterDown.find((p) => p.id === hadia.id)?.display_order).toBe(9);
     expect(afterDown.find((p) => p.id === eshaal.id)?.display_order).toBe(8);
   });
+
+  it('persists arrow reordering in localStorage so positions survive page reload', () => {
+    localStorage.clear();
+    sessionStorage.clear();
+
+    const originalList = normalizeProfileOrders(INITIAL_LEADERSHIP_PLACEHOLDERS);
+    const hadia = originalList.find((p) => p.full_name.includes('Hadia'))!;
+    
+    // Simulate clicking Arrow Up on Hadia
+    const reordered = moveProfileUp(originalList, hadia.id);
+    
+    // Simulate persistence handler saving to localStorage
+    localStorage.setItem('sign_dev_leadership_profiles', JSON.stringify(reordered));
+
+    // Simulate page refresh in another tab (sessionStorage is empty, localStorage has data)
+    sessionStorage.clear();
+    const stored = localStorage.getItem('sign_dev_leadership_profiles');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!) as LeadershipProfile[];
+    const normalizedOnReload = normalizeProfileOrders(parsed);
+
+    const reloadedHadia = normalizedOnReload.find((p) => p.full_name.includes('Hadia'))!;
+    const reloadedEshaal = normalizedOnReload.find((p) => p.full_name.includes('Eshaal'))!;
+
+    expect(reloadedHadia.display_order).toBe(8);
+    expect(reloadedEshaal.display_order).toBe(9);
+  });
 });

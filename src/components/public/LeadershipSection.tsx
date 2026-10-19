@@ -13,10 +13,14 @@ export const LeadershipSection: React.FC = () => {
   useEffect(() => {
     let isMounted = true;
     const fetchLeadership = async () => {
+      let devCachedList: LeadershipProfile[] | null = null;
       try {
-        const devCached = sessionStorage.getItem('sign_dev_leadership_profiles');
-        if (devCached) {
-          const parsed = JSON.parse(devCached) as LeadershipProfile[];
+        const rawCached =
+          localStorage.getItem('sign_dev_leadership_profiles') ||
+          sessionStorage.getItem('sign_dev_leadership_profiles');
+        if (rawCached) {
+          const parsed = JSON.parse(rawCached) as LeadershipProfile[];
+          devCachedList = parsed;
           const published = parsed.filter((p) => p.is_published);
           const existingNames = new Set(published.map((p) => p.full_name.trim().toLowerCase()));
           const missingDefaults = INITIAL_LEADERSHIP_PLACEHOLDERS.filter(
@@ -82,13 +86,23 @@ export const LeadershipSection: React.FC = () => {
                 f.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
             );
             if (fallbackMatch) {
+              const cachedMatch = devCachedList?.find(
+                (c) =>
+                  c.id === p.id ||
+                  c.full_name.trim().toLowerCase() === p.full_name.trim().toLowerCase()
+              );
+              const cachedOrder = cachedMatch ? Number(cachedMatch.display_order) : NaN;
               const orderNum = Number(p.display_order);
+              const resolvedOrder =
+                typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
+                  ? orderNum
+                  : !isNaN(cachedOrder)
+                  ? cachedOrder
+                  : fallbackMatch.display_order;
+
               return {
                 ...p,
-                display_order:
-                  typeof p.display_order !== 'undefined' && p.display_order !== null && !isNaN(orderNum)
-                    ? orderNum
-                    : fallbackMatch.display_order,
+                display_order: resolvedOrder,
                 bio:
                   p.bio &&
                   p.bio.trim().length > 15 &&
