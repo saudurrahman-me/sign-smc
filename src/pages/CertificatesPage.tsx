@@ -33,7 +33,13 @@ export const CertificatesPage: React.FC = () => {
   // URL Query Params handling (?verify=CODE or ?tab=apply)
   const searchParams = new URLSearchParams(location.search);
   const verifyParam = searchParams.get('verify') || '';
-  const initialTab = searchParams.get('tab') === 'apply' ? 'apply' : verifyParam ? 'verify' : 'my-certificates';
+  const tabParam = searchParams.get('tab');
+  const initialTab =
+    tabParam === 'apply'
+      ? 'apply'
+      : tabParam === 'verify' || verifyParam
+      ? 'verify'
+      : 'my-certificates';
 
   const [activeTab, setActiveTab] = useState<'my-certificates' | 'apply' | 'verify'>(initialTab);
 
@@ -500,60 +506,60 @@ export const CertificatesPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#021A0F] text-slate-100">
+    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
       <Navbar />
 
       <main className="flex-1 pt-28 pb-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         {/* Header Hero Banner */}
         <div className="text-center max-w-3xl mx-auto space-y-4 mb-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-semibold">
-            <Award className="w-4 h-4 text-emerald-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-[#016533] border border-emerald-200">
+            <Award className="w-3.5 h-3.5 text-[#016533]" />
             <span>Official Academic Certification</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight">
             Event Certificates & Verification
           </h1>
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+          <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl mx-auto">
             Apply for, download, and verify authenticated certificates of participation for academic seminars, workshops, and clinical neuroscience sessions organized by the SIGN Chapter at Saidu Medical College.
           </p>
         </div>
 
         {/* Tab Navigation Controls */}
         <div className="flex items-center justify-center mb-8">
-          <div className="p-1 rounded-2xl bg-slate-900/90 border border-emerald-900/40 backdrop-blur-md flex items-center gap-1 shadow-lg max-w-md w-full">
+          <div className="inline-flex p-1.5 rounded-2xl bg-slate-200/80 border border-slate-300/70 text-xs sm:text-sm font-bold shadow-xs max-w-md sm:max-w-xl w-full">
             <button
               onClick={() => setActiveTab('my-certificates')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 'my-certificates'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <Award className="w-4 h-4" />
+              <Award className={`w-4 h-4 ${activeTab === 'my-certificates' ? 'text-[#016533]' : 'text-slate-500'}`} />
               <span>My Certificates</span>
             </button>
 
             <button
               onClick={() => setActiveTab('apply')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 'apply'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <PlusCircle className="w-4 h-4" />
+              <PlusCircle className={`w-4 h-4 ${activeTab === 'apply' ? 'text-[#016533]' : 'text-slate-500'}`} />
               <span>Apply for Certificate</span>
             </button>
 
             <button
               onClick={() => setActiveTab('verify')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 'verify'
-                  ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+                  ? 'bg-white text-slate-900 shadow-sm border border-slate-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
               }`}
             >
-              <ShieldCheck className="w-4 h-4" />
+              <ShieldCheck className={`w-4 h-4 ${activeTab === 'verify' ? 'text-[#016533]' : 'text-slate-500'}`} />
               <span>Verify Authenticity</span>
             </button>
           </div>
@@ -565,18 +571,18 @@ export const CertificatesPage: React.FC = () => {
         {activeTab === 'my-certificates' && (
           <div className="space-y-6 max-w-5xl mx-auto">
             {!user ? (
-              <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/80 border border-emerald-900/40 text-center space-y-4 max-w-xl mx-auto shadow-xl">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <div className="p-8 sm:p-12 rounded-3xl bg-white border border-slate-200 text-center space-y-4 max-w-xl mx-auto shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#016533] flex items-center justify-center mx-auto">
                   <LogIn className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-white">Student Account Login Required</h3>
-                <p className="text-xs sm:text-sm text-slate-400">
+                <h3 className="text-xl font-bold text-slate-900">Student Account Login Required</h3>
+                <p className="text-xs sm:text-sm text-slate-600">
                   To view and download your verified event certificates, please sign in with your student account credentials.
                 </p>
                 <div className="pt-2 flex items-center justify-center gap-3">
                   <Link
                     to="/login?from=/certificates"
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all shadow-md shadow-emerald-950/50"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm"
                   >
                     <span>Sign In to Student Portal</span>
                     <ChevronRight className="w-4 h-4" />
@@ -584,23 +590,23 @@ export const CertificatesPage: React.FC = () => {
                 </div>
               </div>
             ) : isLoading ? (
-              <div className="p-12 text-center bg-slate-900/60 rounded-3xl border border-slate-800">
-                <Loader2 className="w-8 h-8 text-emerald-400 animate-spin mx-auto mb-3" />
-                <p className="text-xs text-slate-400">Loading your certificate records...</p>
+              <div className="p-12 text-center bg-white rounded-3xl border border-slate-200 shadow-sm">
+                <Loader2 className="w-8 h-8 text-[#016533] animate-spin mx-auto mb-3" />
+                <p className="text-xs text-slate-500">Loading your certificate records...</p>
               </div>
             ) : certificates.length === 0 ? (
-              <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-4 max-w-lg mx-auto">
-                <div className="w-12 h-12 rounded-2xl bg-slate-800 text-slate-400 flex items-center justify-center mx-auto">
+              <div className="p-8 sm:p-12 rounded-3xl bg-white border border-slate-200 shadow-sm text-center space-y-4 max-w-lg mx-auto">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#016533] flex items-center justify-center mx-auto">
                   <Award className="w-6 h-6" />
                 </div>
-                <h3 className="text-lg font-bold text-white">No Certificate Requests Yet</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="text-lg font-bold text-slate-900">No Certificate Requests Yet</h3>
+                <p className="text-xs text-slate-600">
                   You have not applied for any event certificates yet. Attended a SIGN SMC academic session or workshop?
                 </p>
                 <button
                   type="button"
                   onClick={() => setActiveTab('apply')}
-                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm cursor-pointer"
                 >
                   <PlusCircle className="w-4 h-4" />
                   Apply for Your First Certificate
@@ -616,22 +622,22 @@ export const CertificatesPage: React.FC = () => {
                   return (
                     <div
                       key={cert.id}
-                      className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800 hover:border-emerald-800/60 transition-all shadow-xl flex flex-col justify-between space-y-4"
+                      className="p-6 rounded-2xl bg-white border border-slate-200 shadow-sm hover:border-emerald-500/50 hover:shadow-md transition-all flex flex-col justify-between space-y-4 group"
                     >
                       <div className="space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <span
                             className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border flex items-center gap-1 ${
                               isApproved
-                                ? 'bg-emerald-950 text-emerald-300 border-emerald-800'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                                 : isPending
-                                ? 'bg-amber-950 text-amber-300 border-amber-800'
-                                : 'bg-rose-950 text-rose-300 border-rose-800'
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-rose-50 text-rose-800 border-rose-200'
                             }`}
                           >
-                            {isApproved && <CheckCircle2 className="w-3 h-3 text-emerald-400" />}
-                            {isPending && <Clock className="w-3 h-3 text-amber-400" />}
-                            {isDeclined && <AlertCircle className="w-3 h-3 text-rose-400" />}
+                            {isApproved && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
+                            {isPending && <Clock className="w-3 h-3 text-amber-600" />}
+                            {isDeclined && <AlertCircle className="w-3 h-3 text-rose-600" />}
                             <span>{cert.status.toUpperCase()}</span>
                           </span>
 
@@ -641,12 +647,12 @@ export const CertificatesPage: React.FC = () => {
                         </div>
 
                         <div>
-                          <h3 className="text-base font-bold text-white line-clamp-2">
+                          <h3 className="text-base font-bold text-slate-900 line-clamp-2">
                             {cert.event_title}
                           </h3>
-                          <div className="mt-1 text-xs text-slate-400 space-y-0.5">
+                          <div className="mt-1 text-xs text-slate-600 space-y-0.5">
                             <p>
-                              Recipient: <strong className="text-slate-200">{cert.student_name}</strong>
+                              Recipient: <strong className="text-slate-900">{cert.student_name}</strong>
                               {cert.student_id ? ` • Roll No: ${cert.student_id}` : ''}
                             </p>
                             <p className="text-[11px] text-slate-500">
@@ -657,25 +663,25 @@ export const CertificatesPage: React.FC = () => {
 
                         {/* Status Messages */}
                         {isPending && (
-                          <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-900/40 text-amber-300 text-xs">
+                          <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs">
                             <p className="font-semibold flex items-center gap-1.5">
-                              <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                              <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                               Pending Committee Attendance Review
                             </p>
-                            <p className="text-[11px] text-amber-200/80 mt-1">
+                            <p className="text-[11px] text-amber-700 mt-1">
                               Your attendance register is being cross-checked. You will receive an email once approved and can download your certificate here.
                             </p>
                           </div>
                         )}
 
                         {isDeclined && (
-                          <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-900/40 text-rose-300 text-xs">
+                          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs">
                             <p className="font-semibold flex items-center gap-1.5">
-                              <AlertCircle className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
                               Attendance Record Could Not Be Confirmed
                             </p>
                             {cert.reviewer_notes && (
-                              <p className="text-[11px] text-rose-200/80 mt-1">
+                              <p className="text-[11px] text-rose-700 mt-1">
                                 Note: {cert.reviewer_notes}
                               </p>
                             )}
@@ -697,19 +703,19 @@ export const CertificatesPage: React.FC = () => {
                                 return (
                                   <div
                                     onClick={() => setViewingCert(cert)}
-                                    className="relative h-28 rounded-2xl overflow-hidden border border-slate-800 bg-slate-950/60 cursor-pointer group"
+                                    className="relative h-28 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer group/thumb"
                                     title="Click to view full certificate"
                                   >
                                     <img
                                       src={fileUrl}
                                       alt={cert.event_title}
-                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                                     />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end justify-between p-2.5">
-                                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-slate-900/90 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/70 via-transparent to-transparent flex items-end justify-between p-2.5">
+                                      <span className="text-[10px] uppercase font-bold text-white bg-slate-900/80 px-2 py-0.5 rounded-md border border-slate-700">
                                         {ext.toUpperCase()} Certificate
                                       </span>
-                                      <span className="text-[11px] text-white flex items-center gap-1 font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <span className="text-[11px] text-white flex items-center gap-1 font-semibold opacity-0 group-hover/thumb:opacity-100 transition-opacity">
                                         <Eye className="w-3.5 h-3.5 text-emerald-400" /> View Full
                                       </span>
                                     </div>
@@ -719,16 +725,16 @@ export const CertificatesPage: React.FC = () => {
                               return null;
                             })()}
 
-                            <div className="p-3 rounded-xl bg-emerald-950/50 border border-emerald-900/60 text-emerald-300 text-xs space-y-1">
+                            <div className="p-3.5 rounded-xl bg-emerald-50/90 border border-emerald-200 text-emerald-900 text-xs space-y-1">
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase font-bold text-emerald-400">
+                                <span className="text-[10px] uppercase font-bold text-[#016533]">
                                   Certificate Verification ID
                                 </span>
-                                <span className="font-mono font-bold text-white text-xs">
+                                <span className="font-mono font-bold text-slate-900 text-xs bg-white px-2 py-0.5 rounded border border-emerald-200 shadow-xs">
                                   {cert.certificate_code}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-slate-400">
+                              <p className="text-[11px] text-slate-500">
                                 Issued: {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString() : 'Active'}
                               </p>
                             </div>
@@ -738,20 +744,20 @@ export const CertificatesPage: React.FC = () => {
 
                       {/* Action buttons */}
                       {isApproved && (
-                        <div className="pt-2 flex flex-col sm:flex-row items-center gap-2 border-t border-slate-800/80">
+                        <div className="pt-3 flex flex-col sm:flex-row items-center gap-2 border-t border-slate-100">
                           <button
                             type="button"
                             onClick={() => setViewingCert(cert)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                           >
-                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                            <Eye className="w-3.5 h-3.5 text-[#016533]" />
                             <span>View</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => handleDownloadCertificate(cert)}
-                            className="flex-1 w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md shadow-emerald-950/30 cursor-pointer"
+                            className="flex-1 w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm cursor-pointer"
                           >
                             <Download className="w-3.5 h-3.5" />
                             <span>Download ({getCertificateExtension(cert.certificate_file_url || '', cert.certificate_file_path).toUpperCase()})</span>
@@ -760,10 +766,10 @@ export const CertificatesPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => setSelectedQrCert(cert)}
-                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                             title="Verify QR Code"
                           >
-                            <QrCode className="w-3.5 h-3.5 text-emerald-400" />
+                            <QrCode className="w-3.5 h-3.5 text-[#016533]" />
                             <span>QR</span>
                           </button>
                         </div>
@@ -782,18 +788,18 @@ export const CertificatesPage: React.FC = () => {
         {activeTab === 'apply' && (
           <div className="max-w-2xl mx-auto">
             {!user ? (
-              <div className="p-8 sm:p-12 rounded-3xl bg-slate-900/80 border border-emerald-900/40 text-center space-y-4 shadow-xl">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <div className="p-8 sm:p-12 rounded-3xl bg-white border border-slate-200 text-center space-y-4 shadow-sm">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#016533] flex items-center justify-center mx-auto">
                   <LogIn className="w-7 h-7" />
                 </div>
-                <h3 className="text-xl font-bold text-white">Sign In to Apply for Certificates</h3>
-                <p className="text-xs sm:text-sm text-slate-400">
+                <h3 className="text-xl font-bold text-slate-900">Sign In to Apply for Certificates</h3>
+                <p className="text-xs sm:text-sm text-slate-600">
                   Please log in with your account so your verified certificate is securely linked to your profile and available for instant download.
                 </p>
                 <div className="pt-2">
                   <Link
                     to="/login?from=/certificates?tab=apply"
-                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-all shadow-md shadow-emerald-950/50"
+                    className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm"
                   >
                     <span>Sign In to Continue</span>
                     <ChevronRight className="w-4 h-4" />
@@ -801,15 +807,15 @@ export const CertificatesPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-6">
-                <div className="border-b border-slate-800 pb-4">
+              <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-6">
+                <div className="border-b border-slate-100 pb-4">
                   <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <div className="p-2.5 rounded-xl bg-emerald-50 text-[#016533] border border-emerald-200">
                       <PlusCircle className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-lg font-bold text-white">Apply for Event Certificate</h2>
-                      <p className="text-xs text-slate-400">
+                      <h2 className="text-lg font-bold text-slate-900">Apply for Event Certificate</h2>
+                      <p className="text-xs text-slate-500">
                         Submit your details to receive an official verified certificate for an event you attended.
                       </p>
                     </div>
@@ -819,11 +825,11 @@ export const CertificatesPage: React.FC = () => {
                 <form onSubmit={handleApplySubmit} className="space-y-4">
                   {/* Select Event */}
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                      Attended Event / Seminar <span className="text-emerald-400">*</span>
+                    <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                      Attended Event / Seminar <span className="text-emerald-600">*</span>
                     </label>
                     {isLoadingEvents ? (
-                      <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-500">
+                      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-400">
                         Loading events roster...
                       </div>
                     ) : (
@@ -835,7 +841,7 @@ export const CertificatesPage: React.FC = () => {
                           const ev = eventsList.find((item) => item.title === e.target.value);
                           setSelectedEventId(ev?.id || '');
                         }}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                       >
                         <option value="">-- Select an event from list --</option>
                         {eventsList.map((ev) => (
@@ -850,8 +856,8 @@ export const CertificatesPage: React.FC = () => {
                   {/* Student Full Name & Email */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                        Full Name (Printed on Certificate) <span className="text-emerald-400">*</span>
+                      <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                        Full Name (Printed on Certificate) <span className="text-emerald-600">*</span>
                       </label>
                       <input
                         type="text"
@@ -859,13 +865,13 @@ export const CertificatesPage: React.FC = () => {
                         value={studentName}
                         onChange={(e) => setStudentName(e.target.value)}
                         placeholder="e.g. Zaryab Khan"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                        Student Email (For Notification) <span className="text-emerald-400">*</span>
+                      <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                        Student Email (For Notification) <span className="text-emerald-600">*</span>
                       </label>
                       <input
                         type="email"
@@ -873,7 +879,7 @@ export const CertificatesPage: React.FC = () => {
                         value={studentEmail}
                         onChange={(e) => setStudentEmail(e.target.value)}
                         placeholder="e.g. student@smc.edu.pk"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                       />
                     </div>
                   </div>
@@ -881,8 +887,8 @@ export const CertificatesPage: React.FC = () => {
                   {/* College Roll No & Year */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                        College Roll / Student ID <span className="text-emerald-400">*</span>
+                      <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                        College Roll / Student ID <span className="text-emerald-600">*</span>
                       </label>
                       <input
                         type="text"
@@ -890,18 +896,18 @@ export const CertificatesPage: React.FC = () => {
                         value={studentId}
                         onChange={(e) => setStudentId(e.target.value)}
                         placeholder="e.g. SMC-2023-042"
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                       />
                     </div>
 
                     <div>
-                      <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                        Academic Class / Year <span className="text-emerald-400">*</span>
+                      <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                        Academic Class / Year <span className="text-emerald-600">*</span>
                       </label>
                       <select
                         value={mbbsYear}
                         onChange={(e) => setMbbsYear(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                       >
                         <option value="MBBS - 1st Year">MBBS - 1st Year</option>
                         <option value="MBBS - 2nd Year">MBBS - 2nd Year</option>
@@ -917,8 +923,8 @@ export const CertificatesPage: React.FC = () => {
 
                   {/* Institution */}
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1 text-xs">
-                      Institution / Medical College <span className="text-emerald-400">*</span>
+                    <label className="block text-slate-700 font-semibold mb-1 text-xs">
+                      Institution / Medical College <span className="text-emerald-600">*</span>
                     </label>
                     <input
                       type="text"
@@ -926,13 +932,13 @@ export const CertificatesPage: React.FC = () => {
                       value={collegeName}
                       onChange={(e) => setCollegeName(e.target.value)}
                       placeholder="e.g. Saidu Medical College, Swat"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:border-emerald-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                     />
                   </div>
 
                   {/* Attendance reference / Notes */}
                   <div>
-                    <label className="block text-slate-300 font-semibold mb-1 text-xs">
+                    <label className="block text-slate-700 font-semibold mb-1 text-xs">
                       Session / Attendance Reference (Optional)
                     </label>
                     <textarea
@@ -940,21 +946,21 @@ export const CertificatesPage: React.FC = () => {
                       value={attendanceNotes}
                       onChange={(e) => setAttendanceNotes(e.target.value)}
                       placeholder="e.g. Attended clinical workshops Day 1 & Day 2 in SMC Auditorium..."
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white placeholder-slate-500 focus:border-emerald-500"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                     />
                   </div>
 
                   {/* Feedback Messages */}
                   {applySuccessMsg && (
-                    <div className="p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <span>{applySuccessMsg}</span>
                     </div>
                   )}
 
                   {applyErrorMsg && (
-                    <div className="p-3.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                    <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                       <span>{applyErrorMsg}</span>
                     </div>
                   )}
@@ -963,7 +969,7 @@ export const CertificatesPage: React.FC = () => {
                     <button
                       type="submit"
                       disabled={isSubmitting}
-                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-xs sm:text-sm font-bold text-slate-950 bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-400 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-lg shadow-emerald-950/40 disabled:opacity-50 cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 py-3 px-5 rounded-xl text-xs sm:text-sm font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                     >
                       {isSubmitting ? (
                         <>
@@ -989,34 +995,34 @@ export const CertificatesPage: React.FC = () => {
         {/* ========================================================================= */}
         {activeTab === 'verify' && (
           <div className="max-w-2xl mx-auto space-y-6">
-            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl space-y-5">
+            <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200 shadow-sm space-y-5">
               <div className="text-center space-y-2">
-                <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#016533] flex items-center justify-center mx-auto">
                   <ShieldCheck className="w-6 h-6" />
                 </div>
-                <h2 className="text-lg sm:text-xl font-bold text-white">Verify Certificate Authenticity</h2>
-                <p className="text-xs text-slate-400 max-w-md mx-auto">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900">Verify Certificate Authenticity</h2>
+                <p className="text-xs text-slate-600 max-w-md mx-auto">
                   Enter the unique Certificate ID printed on your document or scanned from the QR code to verify its legitimacy directly from our official registry.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row items-center gap-2">
                 <div className="relative flex-1 w-full">
-                  <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     value={verifyCodeInput}
                     onChange={(e) => setVerifyCodeInput(e.target.value.toUpperCase())}
                     onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
                     placeholder="e.g. SIGN-CERT-2026-NEURO01"
-                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono uppercase tracking-wider text-white placeholder-slate-500 focus:border-emerald-500"
+                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-300 text-xs font-mono uppercase tracking-wider text-slate-900 placeholder-slate-400 focus:bg-white focus:border-[#016533] focus:ring-1 focus:ring-[#016533] outline-none"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => handleVerify()}
                   disabled={isVerifying}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all cursor-pointer shrink-0 disabled:opacity-50"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all cursor-pointer shrink-0 disabled:opacity-50 shadow-sm"
                 >
                   {isVerifying ? (
                     <span className="flex items-center gap-1.5">
@@ -1029,8 +1035,8 @@ export const CertificatesPage: React.FC = () => {
               </div>
 
               {verifyError && (
-                <div className="p-3.5 rounded-xl bg-rose-950/80 border border-rose-800 text-rose-300 text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 text-rose-400 shrink-0" />
+                <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
                   <span>{verifyError}</span>
                 </div>
               )}
@@ -1038,67 +1044,67 @@ export const CertificatesPage: React.FC = () => {
 
             {/* Official Verification Seal Card */}
             {verifiedCert && (
-              <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-slate-900 to-slate-950 border-2 border-emerald-500/60 shadow-2xl relative overflow-hidden space-y-5 animate-in fade-in duration-300">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-[#016533] shadow-md relative overflow-hidden space-y-5 animate-in fade-in duration-300">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-emerald-900/50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300">
+                    <div className="p-2 rounded-xl bg-emerald-50 text-[#016533] border border-emerald-200">
                       <ShieldCheck className="w-6 h-6" />
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 block">
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-[#016533] block">
                         Official Verification Certificate
                       </span>
-                      <h3 className="text-base font-bold text-white">
+                      <h3 className="text-base font-bold text-slate-900">
                         Authenticated SIGN SMC Record
                       </h3>
                     </div>
                   </div>
 
-                  <span className="px-3 py-1 rounded-full text-xs font-black bg-emerald-950 text-emerald-300 border border-emerald-600 flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
                     VERIFIED LEGITIMATE
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-[10px] uppercase text-slate-500 block font-semibold">
                       Recipient Student
                     </span>
-                    <span className="font-bold text-white text-sm block mt-0.5">
+                    <span className="font-bold text-slate-900 text-sm block mt-0.5">
                       {verifiedCert.student_name}
                     </span>
-                    <span className="text-slate-400 text-[11px]">
+                    <span className="text-slate-500 text-[11px]">
                       {verifiedCert.college_name || 'Saidu Medical College'}
                       {verifiedCert.student_id ? ` • Roll: ${verifiedCert.student_id}` : ''}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-[10px] uppercase text-slate-500 block font-semibold">
                       Academic Event
                     </span>
-                    <span className="font-bold text-emerald-300 text-sm block mt-0.5 line-clamp-2">
+                    <span className="font-bold text-[#016533] text-sm block mt-0.5 line-clamp-2">
                       {verifiedCert.event_title}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-[10px] uppercase text-slate-500 block font-semibold">
                       Unique Certificate ID
                     </span>
-                    <span className="font-mono font-bold text-white text-xs block mt-0.5">
+                    <span className="font-mono font-bold text-slate-900 text-xs block mt-0.5">
                       {verifiedCert.certificate_code}
                     </span>
                   </div>
 
-                  <div className="p-3 rounded-2xl bg-slate-950/80 border border-slate-800">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
                     <span className="text-[10px] uppercase text-slate-500 block font-semibold">
                       Issuance Details
                     </span>
-                    <span className="text-slate-300 text-xs block mt-0.5">
+                    <span className="text-slate-800 text-xs block mt-0.5 font-medium">
                       Issued on {verifiedCert.issued_at ? new Date(verifiedCert.issued_at).toLocaleDateString() : 'Verified Record'}
                     </span>
                     <span className="text-[10px] text-slate-500 block">
@@ -1108,20 +1114,20 @@ export const CertificatesPage: React.FC = () => {
                 </div>
 
                 {verifiedCert.certificate_file_url && (
-                  <div className="pt-2 flex items-center justify-end gap-2 flex-wrap">
+                  <div className="pt-2 flex items-center justify-end gap-2 flex-wrap border-t border-slate-100">
                     <button
                       type="button"
                       onClick={() => setViewingCert(verifiedCert)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
                     >
-                      <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                      <Eye className="w-3.5 h-3.5 text-[#016533]" />
                       <span>View Full Certificate</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleDownloadCertificate(verifiedCert)}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-slate-950 bg-emerald-400 hover:bg-emerald-300 transition-colors shadow-sm cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-colors shadow-sm cursor-pointer"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>Download ({getCertificateExtension(verifiedCert.certificate_file_url || '', verifiedCert.certificate_file_path).toUpperCase()})</span>
@@ -1136,34 +1142,34 @@ export const CertificatesPage: React.FC = () => {
         {/* QR Code Modal Dialog */}
         {selectedQrCert && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200"
             onClick={() => setSelectedQrCert(null)}
           >
             <div
-              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative"
+              className="bg-white border border-slate-200 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl relative"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
                 onClick={() => setSelectedQrCert(null)}
-                className="absolute top-4 right-4 p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-[#016533] flex items-center justify-center mx-auto">
                 <QrCode className="w-6 h-6" />
               </div>
 
               <div>
-                <h3 className="text-base font-bold text-white">Certificate Verification QR</h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <h3 className="text-base font-bold text-slate-900">Certificate Verification QR</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
                   Scan to verify authentic certificate status
                 </p>
               </div>
 
               {/* QR Image */}
-              <div className="p-4 bg-white rounded-2xl w-48 h-48 mx-auto flex items-center justify-center shadow-inner">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl w-48 h-48 mx-auto flex items-center justify-center shadow-inner">
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(
                     `${window.location.origin}/certificates?verify=${selectedQrCert.certificate_code}`
@@ -1173,18 +1179,18 @@ export const CertificatesPage: React.FC = () => {
                 />
               </div>
 
-              <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs font-bold text-emerald-300">
+              <div className="p-2.5 rounded-xl bg-slate-100 border border-slate-200 font-mono text-xs font-bold text-[#016533]">
                 {selectedQrCert.certificate_code}
               </div>
 
               <button
                 type="button"
                 onClick={() => handleCopyVerificationLink(selectedQrCert.certificate_code || '')}
-                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-200 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 {copiedLink ? (
                   <>
-                    <Check className="w-3.5 h-3.5 text-emerald-400" />
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
                     <span>Verification Link Copied!</span>
                   </>
                 ) : (
@@ -1201,35 +1207,35 @@ export const CertificatesPage: React.FC = () => {
         {/* Certificate Viewer Modal Dialog (PNG / Image / PDF) */}
         {viewingCert && (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200"
             onClick={() => setViewingCert(null)}
           >
             <div
-              className="bg-slate-900 border border-slate-800 rounded-3xl max-w-4xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] flex flex-col"
+              className="bg-white border border-slate-200 rounded-3xl max-w-4xl w-full p-4 sm:p-6 space-y-4 shadow-2xl relative max-h-[92vh] flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <button
                 type="button"
                 onClick={() => setViewingCert(null)}
-                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer z-10"
+                className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer z-10"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className="flex items-start justify-between pr-8 border-b border-slate-800 pb-3">
+              <div className="flex items-start justify-between pr-8 border-b border-slate-100 pb-3">
                 <div>
-                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                    <Award className="w-5 h-5 text-emerald-400 shrink-0" />
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-[#016533] shrink-0" />
                     <span className="line-clamp-1">{viewingCert.event_title || 'Certificate of Participation'}</span>
                   </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Awarded to <strong className="text-slate-200">{viewingCert.student_name}</strong> &bull; Verification Code: <span className="font-mono text-emerald-400 font-semibold">{viewingCert.certificate_code}</span>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Awarded to <strong className="text-slate-800">{viewingCert.student_name}</strong> &bull; Verification Code: <span className="font-mono text-[#016533] font-semibold">{viewingCert.certificate_code}</span>
                   </p>
                 </div>
               </div>
 
               {/* Certificate Media Viewer */}
-              <div className="flex-1 overflow-auto rounded-2xl bg-slate-950/90 border border-slate-800/80 flex items-center justify-center p-2 min-h-[320px]">
+              <div className="flex-1 overflow-auto rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center p-2 min-h-[320px]">
                 {(() => {
                   const fileUrl =
                     viewingCert.certificate_file_url?.startsWith('blob:') ||
@@ -1244,7 +1250,7 @@ export const CertificatesPage: React.FC = () => {
                       <img
                         src={fileUrl}
                         alt={`${viewingCert.student_name}'s Certificate`}
-                        className="max-h-[62vh] max-w-full object-contain rounded-xl shadow-2xl"
+                        className="max-h-[62vh] max-w-full object-contain rounded-xl shadow-lg"
                       />
                     );
                   }
@@ -1253,17 +1259,17 @@ export const CertificatesPage: React.FC = () => {
                     <iframe
                       src={fileUrl}
                       title="Certificate Document Viewer"
-                      className="w-full h-[62vh] rounded-xl border-0 bg-slate-900"
+                      className="w-full h-[62vh] rounded-xl border-0 bg-white"
                     />
                   );
                 })()}
               </div>
 
               {/* Viewer Footer */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
-                <span className="text-[11px] text-slate-400">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                <span className="text-[11px] text-slate-500">
                   Format:{' '}
-                  <strong className="text-emerald-400 uppercase font-mono">
+                  <strong className="text-[#016533] uppercase font-mono font-bold">
                     {getCertificateExtension(viewingCert.certificate_file_url || '', viewingCert.certificate_file_path)}
                   </strong>
                 </span>
@@ -1271,7 +1277,7 @@ export const CertificatesPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => handleDownloadCertificate(viewingCert)}
-                  className="inline-flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold text-slate-950 bg-gradient-to-r from-emerald-400 to-teal-300 hover:from-emerald-300 hover:to-teal-200 transition-all shadow-md cursor-pointer"
+                  className="inline-flex items-center gap-1.5 py-2 px-4 rounded-xl text-xs font-bold text-white bg-[#016533] hover:bg-[#014d27] transition-all shadow-sm cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   <span>Download {getCertificateExtension(viewingCert.certificate_file_url || '', viewingCert.certificate_file_path).toUpperCase()} File</span>
@@ -1286,3 +1292,4 @@ export const CertificatesPage: React.FC = () => {
     </div>
   );
 };
+
