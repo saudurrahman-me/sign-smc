@@ -35,10 +35,10 @@ export const Navbar: React.FC = () => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-[#031D12] ${
         isScrolled
-          ? 'glass-nav py-2.5 shadow-lg shadow-black/40 border-b border-emerald-900/50'
-          : 'bg-[#031D12]/95 backdrop-blur-md py-3.5 border-b border-emerald-900/40'
+          ? 'py-2.5 shadow-xl shadow-black/50 border-b border-emerald-800/70'
+          : 'py-3.5 shadow-md shadow-black/30 border-b border-emerald-900/60'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -161,7 +161,7 @@ export const Navbar: React.FC = () => {
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="lg:hidden border-t border-emerald-900/50 bg-[#031D12]/98 px-4 pt-3 pb-6 shadow-2xl animate-in slide-in-from-top-2 duration-200">
+        <div className="lg:hidden border-t border-emerald-900/50 bg-[#031D12] px-4 pt-3 pb-6 shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="flex flex-col space-y-2">
             {navLinks.map((link) => {
               if (link.isRoute) {
