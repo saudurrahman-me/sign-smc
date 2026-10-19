@@ -20,34 +20,42 @@ export const Footer: React.FC = () => {
   ];
 
   return (
-    <footer className="relative bg-gradient-to-b from-[#031d12] via-[#02130b] to-[#010905] text-slate-300 pt-16 pb-12 border-t border-emerald-900/40 overflow-hidden">
+    <footer className="relative bg-gradient-to-b from-[#073824] via-[#042819] to-[#032014] text-slate-300 pt-16 pb-12 border-t border-emerald-700/50 overflow-hidden">
       {/* Top Accent Gradient Border */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" />
 
-      {/* Decorative Background Atmosphere & Watermark (Behind Content) */}
+      {/* Decorative Background Atmosphere & Scalable Watermark (Behind Content) */}
       <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden="true">
         {/* Ambient Radial Lighting Glows */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-emerald-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-teal-600/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-emerald-400/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-emerald-500/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl" />
 
         {/* Subtle Neural Dot Matrix Pattern */}
-        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.05]" />
+        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.07]" />
 
-        {/* Large Decorative Watermark Brain Emblem */}
-        <div className="absolute -right-10 -bottom-12 opacity-[0.045] flex items-center justify-center">
-          <img
-            src="/sign-smc-logo-white.png"
-            alt=""
-            className="w-[380px] h-[380px] object-contain rotate-[-8deg]"
-          />
-        </div>
-
-        {/* Big Large SIGN SMC Text Watermark */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-full text-center">
-          <span className="text-[90px] sm:text-[140px] md:text-[190px] lg:text-[230px] font-black tracking-widest text-emerald-400/[0.035] leading-none whitespace-nowrap select-none block">
-            SIGN • SMC
-          </span>
+        {/* Big Large SIGN SMC Text Watermark - Fully Vector Scalable across 90%, 100%, 150% Zoom */}
+        <div className="absolute bottom-1 left-0 right-0 w-full px-4 sm:px-8 flex justify-center items-end">
+          <svg
+            viewBox="0 0 1000 120"
+            className="w-full max-w-5xl h-auto max-h-28 sm:max-h-36 md:max-h-44"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <text
+              x="50%"
+              y="78%"
+              textAnchor="middle"
+              className="font-black uppercase fill-emerald-300/[0.08]"
+              style={{
+                fontSize: '110px',
+                fontWeight: 900,
+                letterSpacing: '0.12em',
+                fontFamily: 'inherit',
+              }}
+            >
+              SIGN SMC
+            </text>
+          </svg>
         </div>
       </div>
 
