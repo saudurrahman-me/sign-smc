@@ -460,7 +460,11 @@ export const MembershipSection: React.FC = () => {
           </div>
         ) : (
           /* When Intake is CLOSED / PAUSED / UPCOMING */
-          <div className="rounded-3xl bg-slate-900 text-white p-8 sm:p-12 shadow-2xl border border-slate-800 text-center relative overflow-hidden">
+          <div className="rounded-3xl bg-[#031D12] text-white p-8 sm:p-12 shadow-2xl border border-emerald-900/60 text-center relative overflow-hidden">
+            {/* Ambient emerald blur */}
+            <div className="absolute -top-24 -left-24 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-24 -right-24 w-72 h-72 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />
+
             <div className="max-w-xl mx-auto relative z-10 space-y-4">
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto mb-2 shadow-inner">
                 <Clock className="w-8 h-8 text-amber-400" />
@@ -475,25 +479,25 @@ export const MembershipSection: React.FC = () => {
                 {intakeEvaluation.headline}
               </h3>
 
-              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-lg mx-auto">
+              <p className="text-xs sm:text-sm text-emerald-100/80 leading-relaxed max-w-lg mx-auto">
                 {intakeEvaluation.message}
               </p>
 
               {/* Institutional Enrollment Cycle Card */}
-              <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 max-w-md mx-auto text-xs text-slate-300 text-left space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                  <span className="text-slate-400">Academic Intake:</span>
+              <div className="p-4 rounded-2xl bg-emerald-950/60 border border-emerald-800/60 max-w-md mx-auto text-xs text-emerald-200/90 text-left space-y-2 shadow-xs">
+                <div className="flex items-center justify-between border-b border-emerald-900/70 pb-1.5">
+                  <span className="text-emerald-300/80">Academic Intake:</span>
                   <span className="font-bold text-white">{intakeEvaluation.termName}</span>
                 </div>
-                <div className="flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                  <span className="text-slate-400">Intake Policy:</span>
-                  <span className="text-slate-300">Organized at start/end of semesters</span>
+                <div className="flex items-center justify-between border-b border-emerald-900/70 pb-1.5">
+                  <span className="text-emerald-300/80">Intake Policy:</span>
+                  <span className="text-emerald-200">Organized at start/end of semesters</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Secretariat Email:</span>
+                  <span className="text-emerald-300/80">Secretariat Email:</span>
                   <a
                     href="mailto:signsmc.official@gmail.com"
-                    className="font-mono text-emerald-400 hover:underline"
+                    className="font-mono text-emerald-400 hover:text-emerald-300 hover:underline"
                   >
                     signsmc.official@gmail.com
                   </a>
@@ -505,20 +509,20 @@ export const MembershipSection: React.FC = () => {
                 <button
                   type="button"
                   disabled
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-slate-400 bg-slate-800/60 border border-slate-700/60 cursor-not-allowed"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs font-bold text-emerald-300/60 bg-emerald-950/80 border border-emerald-800/50 cursor-not-allowed"
                 >
                   Applications Paused for Current Session
                 </button>
 
                 <a
                   href="mailto:signsmc.official@gmail.com?subject=SIGN%20SMC%20Membership%20Inquiry"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950/40 hover:bg-emerald-950/80 border border-emerald-800/50 transition-all"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 border border-emerald-400/40 shadow-lg shadow-emerald-950/40 transition-all transform hover:-translate-y-0.5"
                 >
                   Contact Executive Board &rarr;
                 </a>
               </div>
 
-              <div className="mt-8 pt-6 border-t border-slate-800 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-slate-400">
+              <div className="mt-8 pt-6 border-t border-emerald-950/80 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[11px] text-emerald-200/70">
                 <span>• Saidu Medical College (SMC)</span>
                 <span>• Official Secretariat: signsmc.official@gmail.com</span>
                 <span>• Swat, Khyber Pakhtunkhwa</span>
