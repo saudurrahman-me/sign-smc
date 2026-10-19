@@ -20,9 +20,39 @@ export const Footer: React.FC = () => {
   ];
 
   return (
-    <footer className="bg-[#02160C] text-slate-300 pt-16 pb-12 border-t border-emerald-950">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-emerald-950/80">
+    <footer className="relative bg-gradient-to-b from-[#031d12] via-[#02130b] to-[#010905] text-slate-300 pt-16 pb-12 border-t border-emerald-900/40 overflow-hidden">
+      {/* Top Accent Gradient Border */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400/40 to-transparent" />
+
+      {/* Decorative Background Atmosphere & Watermark (Behind Content) */}
+      <div className="absolute inset-0 pointer-events-none select-none overflow-hidden" aria-hidden="true">
+        {/* Ambient Radial Lighting Glows */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-48 bg-emerald-500/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -right-20 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-teal-600/5 rounded-full blur-3xl" />
+
+        {/* Subtle Neural Dot Matrix Pattern */}
+        <div className="absolute inset-0 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:28px_28px] opacity-[0.05]" />
+
+        {/* Large Decorative Watermark Brain Emblem */}
+        <div className="absolute -right-10 -bottom-12 opacity-[0.045] flex items-center justify-center">
+          <img
+            src="/sign-smc-logo-white.png"
+            alt=""
+            className="w-[380px] h-[380px] object-contain rotate-[-8deg]"
+          />
+        </div>
+
+        {/* Big Large SIGN SMC Text Watermark */}
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-full text-center">
+          <span className="text-[90px] sm:text-[140px] md:text-[190px] lg:text-[230px] font-black tracking-widest text-emerald-400/[0.035] leading-none whitespace-nowrap select-none block">
+            SIGN • SMC
+          </span>
+        </div>
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-10 pb-12 border-b border-emerald-900/60">
           {/* Brand & Identity Column */}
           <div className="md:col-span-2">
             <SignLogo variant="full" size="md" inverted={true} />
