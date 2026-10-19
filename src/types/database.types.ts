@@ -112,10 +112,6 @@ export interface EventItem {
   support_phone?: string | null;
   support_email?: string | null;
   support_instructions?: string | null;
-
-  // Registration Status & Deadline Controls
-  is_registration_open?: boolean;
-  registration_deadline?: string | null;
 }
 
 export interface MembershipApplication {

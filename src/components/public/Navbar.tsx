@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Shield, User as UserIcon, LogOut, Award, Clock } from 'lucide-react';
+import { Menu, X, Shield, User as UserIcon, LogOut, Award } from 'lucide-react';
 import { SignLogo } from '../brand/SignLogo';
 import { useAuth } from '../../context/AuthContext';
 import { APP_VERSION } from '../../config/version';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { OFFICIAL_SETTINGS } from '../../data/fallback-content';
-import { evaluateMembershipIntake } from '../../lib/membership-schedule';
-import type { SiteSettings } from '../../types/database.types';
 
 export const Navbar: React.FC = () => {
   const { user, profile, isWebsiteAdmin, isEventManager, isSuperAdmin, signOut } = useAuth();
@@ -15,61 +11,6 @@ export const Navbar: React.FC = () => {
   const isHomePage = location.pathname === '/';
   const [isOpen, setIsOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
-  const [siteSettings, setSiteSettings] = useState<SiteSettings>(OFFICIAL_SETTINGS);
-
-  useEffect(() => {
-    let isMounted = true;
-    const loadSettings = async () => {
-      try {
-        const cached =
-          localStorage.getItem('sign_site_settings') ||
-          sessionStorage.getItem('sign_site_settings');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (parsed && isMounted) {
-            setSiteSettings((prev) => ({ ...prev, ...parsed }));
-          }
-        }
-      } catch {
-        // ignore
-      }
-
-      if (!isSupabaseConfigured) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('site_settings')
-          .select('*')
-          .eq('id', 1)
-          .single();
-
-        if (!error && data && isMounted) {
-          setSiteSettings((prev) => ({ ...prev, ...data }));
-        }
-      } catch {
-        // ignore
-      }
-    };
-
-    loadSettings();
-
-    const handleSettingsUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<SiteSettings>;
-      if (customEvent.detail && isMounted) {
-        setSiteSettings((prev) => ({ ...prev, ...customEvent.detail }));
-      } else {
-        loadSettings();
-      }
-    };
-
-    window.addEventListener('sign_settings_updated', handleSettingsUpdated);
-    return () => {
-      isMounted = false;
-      window.removeEventListener('sign_settings_updated', handleSettingsUpdated);
-    };
-  }, []);
-
-  const intakeEval = evaluateMembershipIntake(siteSettings);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -181,15 +122,9 @@ export const Navbar: React.FC = () => {
                 </Link>
                 <a
                   href="#membership"
-                  className={`inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all transform hover:-translate-y-0.5 ${
-                    intakeEval.isOpen
-                      ? 'text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/40'
-                      : 'text-amber-300 bg-amber-950/80 hover:bg-amber-900 border border-amber-700/60 shadow-xs'
-                  }`}
-                  title={intakeEval.isOpen ? 'Apply for Student Membership' : intakeEval.message}
+                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/40 transition-all transform hover:-translate-y-0.5"
                 >
-                  {!intakeEval.isOpen && <Clock className="w-3.5 h-3.5 text-amber-400" />}
-                  <span>{intakeEval.isOpen ? 'Apply for Membership' : intakeEval.badgeText}</span>
+                  Apply for Membership
                 </a>
               </div>
             )}
@@ -293,14 +228,9 @@ export const Navbar: React.FC = () => {
                   <a
                     href="#membership"
                     onClick={() => setIsOpen(false)}
-                    className={`w-full text-center px-4 py-2.5 rounded-lg text-sm font-bold transition-all inline-flex items-center justify-center gap-2 ${
-                      intakeEval.isOpen
-                        ? 'text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] shadow-md'
-                        : 'text-amber-300 bg-amber-950/80 border border-amber-700/60'
-                    }`}
+                    className="w-full text-center px-4 py-2.5 rounded-lg text-sm font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] shadow-md transition-all"
                   >
-                    {!intakeEval.isOpen && <Clock className="w-4 h-4 text-amber-400" />}
-                    <span>{intakeEval.isOpen ? 'Apply for Membership' : intakeEval.badgeText}</span>
+                    Apply for Membership
                   </a>
                 </>
               )}
