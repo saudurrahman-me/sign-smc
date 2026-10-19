@@ -40,6 +40,7 @@ import {
   Tag,
   ShieldCheck,
 } from 'lucide-react';
+import { APP_VERSION } from '../../config/version';
 
 export const AdminEventsPage: React.FC = () => {
   const { user } = useAuth();
@@ -880,10 +881,15 @@ export const AdminEventsPage: React.FC = () => {
       {/* Top Banner / Title */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-teal-400" />
-            <span>Academic Events & Conferences</span>
-          </h1>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              <Calendar className="w-6 h-6 text-teal-400" />
+              <span>Academic Events & Conferences</span>
+            </h1>
+            <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-full shadow-sm">
+              {APP_VERSION}
+            </span>
+          </div>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Publish neurology conferences, workshops, webinars, and configure adjustable fees, ambassador codes, and attendee registrations.
           </p>

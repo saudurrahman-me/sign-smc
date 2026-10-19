@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, Award } from 'lucide-react';
 import { SignLogo } from '../brand/SignLogo';
 import { FacebookIcon, InstagramIcon } from '../brand/SocialIcons';
+import { APP_VERSION } from '../../config/version';
 
 export const Footer: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -124,9 +125,15 @@ export const Footer: React.FC = () => {
 
         {/* Bottom Bar & Disclaimer */}
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
-          <p>
-            &copy; {currentYear} SIGN Chapter — Saidu Medical College, Swat. All rights reserved.
-          </p>
+          <div className="flex items-center gap-3 flex-wrap justify-center md:justify-start">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#031D12] border border-emerald-800/60 text-emerald-300 shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {APP_VERSION}
+            </span>
+            <p>
+              &copy; {currentYear} SIGN Chapter — Saidu Medical College, Swat. All rights reserved.
+            </p>
+          </div>
           <p className="text-[11px] text-slate-400 text-center md:text-right max-w-xl">
             Disclaimer: SIGN is a student-led academic society established under the auspices of Saidu Medical College.
           </p>

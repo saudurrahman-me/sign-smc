@@ -24,6 +24,7 @@ import {
   ExternalLink,
   Award,
 } from 'lucide-react';
+import { APP_VERSION } from '../../config/version';
 
 export const AdminOverviewPage: React.FC = () => {
   const { user, profile, isSuperAdmin, isWebsiteAdmin, isEventManager } = useAuth();
@@ -329,10 +330,15 @@ export const AdminOverviewPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs shadow-sm">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-slate-400">Platform:</span>
+            <span className="font-bold text-emerald-300 font-mono">{APP_VERSION}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center gap-2 text-xs shadow-sm">
             <Database className="w-3.5 h-3.5 text-teal-400" />
-            <span className="text-slate-400">Database Status:</span>
+            <span className="text-slate-400">Database:</span>
             <span className={`font-semibold ${isSupabaseConfigured ? 'text-emerald-400' : 'text-amber-400'}`}>
               {isSupabaseConfigured ? 'Connected' : 'Setup Pending'}
             </span>

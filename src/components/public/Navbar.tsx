@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Menu, X, Shield, User as UserIcon, LogOut, Award } from 'lucide-react';
 import { SignLogo } from '../brand/SignLogo';
 import { useAuth } from '../../context/AuthContext';
+import { APP_VERSION } from '../../config/version';
 
 export const Navbar: React.FC = () => {
   const { user, profile, isWebsiteAdmin, isEventManager, isSuperAdmin, signOut } = useAuth();
@@ -233,6 +234,9 @@ export const Navbar: React.FC = () => {
                   </a>
                 </>
               )}
+              <div className="pt-2 text-center border-t border-emerald-950/60 mt-1">
+                <span className="text-[10px] font-mono text-emerald-400/80">SIGN SMC • {APP_VERSION}</span>
+              </div>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { APP_VERSION } from '../../config/version';
 
 export const AdminLayout: React.FC = () => {
   const { user, profile, isSuperAdmin, isWebsiteAdmin, isEventManager, signOut } = useAuth();
@@ -106,7 +107,9 @@ export const AdminLayout: React.FC = () => {
               >
                 {badge.label}
               </span>
-              <span className="text-[11px] text-slate-500">v1.0.0</span>
+              <span className="text-[11px] font-mono text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/60 px-2 py-0.5 rounded-md shadow-sm">
+                {APP_VERSION}
+              </span>
             </div>
           </div>
 
@@ -144,6 +147,11 @@ export const AdminLayout: React.FC = () => {
             </span>
           </div>
 
+          <div className="px-3 py-1 flex items-center justify-between text-[11px] text-slate-500">
+            <span>Platform Release</span>
+            <span className="font-mono text-emerald-400/90 font-semibold">{APP_VERSION}</span>
+          </div>
+
           <Link
             to="/"
             className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-slate-400 hover:text-emerald-400 hover:bg-slate-800 transition-colors"
@@ -167,7 +175,12 @@ export const AdminLayout: React.FC = () => {
 
       {/* Mobile Top Bar */}
       <div className="md:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800">
-        <SignLogo variant="icon" size="sm" />
+        <div className="flex items-center gap-2">
+          <SignLogo variant="icon" size="sm" />
+          <span className="text-[10px] font-mono text-emerald-400 font-bold bg-emerald-950/80 border border-emerald-800/60 px-1.5 py-0.5 rounded">
+            {APP_VERSION}
+          </span>
+        </div>
         <span
           className={`text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full border ${badge.color}`}
         >
@@ -205,9 +218,12 @@ export const AdminLayout: React.FC = () => {
             );
           })}
           <div className="pt-2 border-t border-slate-800 flex items-center justify-between">
-            <Link to="/" className="text-xs text-slate-400 hover:text-emerald-400">
-              Public Site
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link to="/" className="text-xs text-slate-400 hover:text-emerald-400">
+                Public Site
+              </Link>
+              <span className="text-[10px] font-mono text-emerald-400/80">({APP_VERSION})</span>
+            </div>
             <button
               onClick={() => {
                 signOut();

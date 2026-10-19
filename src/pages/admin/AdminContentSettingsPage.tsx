@@ -20,6 +20,7 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
+import { APP_VERSION } from '../../config/version';
 
 export const AdminContentSettingsPage: React.FC = () => {
   const { user } = useAuth();
@@ -328,9 +329,14 @@ export const AdminContentSettingsPage: React.FC = () => {
       {/* Page Title */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 block mb-1">
-            Institutional Settings
-          </span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="text-xs font-semibold uppercase tracking-wider text-cyan-400 block mb-1">
+              Institutional Settings
+            </span>
+            <span className="text-[10px] font-mono text-cyan-300 font-bold bg-cyan-950/80 border border-cyan-800/60 px-2 py-0.5 rounded-full mb-1 shadow-sm">
+              {APP_VERSION}
+            </span>
+          </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white">
             Content Copy & Digital Coordinates
           </h1>

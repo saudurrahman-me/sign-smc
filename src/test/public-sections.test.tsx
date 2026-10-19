@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { AboutSection } from '../components/public/AboutSection';
 import { MissionVisionSection } from '../components/public/MissionVisionSection';
 import { LeadershipSection } from '../components/public/LeadershipSection';
 import { EventsSection } from '../components/public/EventsSection';
 import { ContactSection } from '../components/public/ContactSection';
+import { Footer } from '../components/public/Footer';
 import { OFFICIAL_CONTENT, INITIAL_LEADERSHIP_PLACEHOLDERS } from '../data/fallback-content';
+import { APP_VERSION } from '../config/version';
 
 describe('Public Website Academic Sections', () => {
   beforeEach(() => {
@@ -148,5 +151,14 @@ describe('Public Website Academic Sections', () => {
     expect(screen.getByText(/signsmc.official@gmail.com/i)).toBeInTheDocument();
     expect(screen.getByText(/Instagram Channel/i)).toBeInTheDocument();
     expect(screen.getByText(/Facebook Community/i)).toBeInTheDocument();
+  });
+
+  it('renders public footer with central platform version badge', () => {
+    render(
+      <MemoryRouter>
+        <Footer />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(APP_VERSION)).toBeInTheDocument();
   });
 });
