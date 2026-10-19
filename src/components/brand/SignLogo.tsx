@@ -7,6 +7,7 @@ interface SignLogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   inverted?: boolean;
+  subtitleClassName?: string;
 }
 
 export const SignLogo: React.FC<SignLogoProps> = ({
@@ -14,6 +15,7 @@ export const SignLogo: React.FC<SignLogoProps> = ({
   size = 'md',
   className = '',
   inverted = false,
+  subtitleClassName = '',
 }) => {
   const sizeMap = {
     sm: { imgClass: 'h-9 w-auto', text: 'text-sm', sub: 'text-[8.5px]', gap: 'gap-2.5' },
@@ -57,7 +59,7 @@ export const SignLogo: React.FC<SignLogoProps> = ({
         <span
           className={`font-medium tracking-wide ${dim.sub} ${
             inverted ? 'text-emerald-100/80' : 'text-slate-600'
-          }`}
+          } ${subtitleClassName}`}
         >
           Student Interest Group in Neurology
         </span>
