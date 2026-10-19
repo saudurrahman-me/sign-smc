@@ -45,7 +45,7 @@ export const Navbar: React.FC = () => {
         <div className="flex items-center justify-between">
           {/* Logo Branding */}
           <Link to="/" className="focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg">
-            <SignLogo variant="full" size="sm" inverted={true} />
+            <SignLogo variant="full" size="md" inverted={true} />
           </Link>
 
           {/* Desktop Navigation Links */}
