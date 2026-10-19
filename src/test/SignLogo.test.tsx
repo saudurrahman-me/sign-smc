@@ -13,6 +13,6 @@ describe('SignLogo Brand Component', () => {
     expect(screen.getByText('SIGN-SMC')).toBeInTheDocument();
     expect(screen.getByText('Student Interest Group in Neurology')).toBeInTheDocument();
     const emblem = screen.getByLabelText('SIGN Neuroscience Emblem');
-    expect(emblem).toHaveClass('h-[52px]');
+    expect(emblem).toHaveClass('h-11');
   });
 });

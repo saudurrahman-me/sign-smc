@@ -16,8 +16,8 @@ export const SignLogo: React.FC<SignLogoProps> = ({
   inverted = false,
 }) => {
   const sizeMap = {
-    sm: { imgClass: 'h-10 w-auto', text: 'text-base', sub: 'text-[9px]', gap: 'gap-3' },
-    md: { imgClass: 'h-[52px] w-auto', text: 'text-xl sm:text-[22px]', sub: 'text-[10px] sm:text-[11.5px]', gap: 'gap-3.5' },
+    sm: { imgClass: 'h-9 w-auto', text: 'text-sm', sub: 'text-[8.5px]', gap: 'gap-2.5' },
+    md: { imgClass: 'h-11 w-auto', text: 'text-lg', sub: 'text-[9.5px]', gap: 'gap-3' },
     lg: { imgClass: 'h-16 w-auto', text: 'text-2xl', sub: 'text-xs', gap: 'gap-4' },
     xl: { imgClass: 'h-24 w-auto', text: 'text-4xl', sub: 'text-sm', gap: 'gap-5' },
   };

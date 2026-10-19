@@ -37,19 +37,25 @@ export const Navbar: React.FC = () => {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'glass-nav py-3 shadow-lg shadow-black/30'
-          : 'bg-[#031D12]/94 backdrop-blur-md py-4 border-b border-emerald-900/40'
+          ? 'glass-nav py-2.5 shadow-lg shadow-black/40 border-b border-emerald-900/50'
+          : 'bg-[#031D12]/95 backdrop-blur-md py-3.5 border-b border-emerald-900/40'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 lg:gap-4 flex-nowrap">
           {/* Logo Branding */}
-          <Link to="/" className="focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg">
+          <Link
+            to="/"
+            className="shrink-0 flex items-center focus:outline-none focus:ring-2 focus:ring-emerald-400 rounded-lg group"
+          >
             <SignLogo variant="full" size="md" inverted={true} />
           </Link>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-6" aria-label="Main Navigation">
+          <nav
+            className="hidden lg:flex items-center gap-1 xl:gap-2 2xl:gap-3 shrink min-w-0"
+            aria-label="Main Navigation"
+          >
             {navLinks.map((link) => {
               if (link.isRoute) {
                 const isActive = location.pathname === link.href;
@@ -57,84 +63,93 @@ export const Navbar: React.FC = () => {
                   <Link
                     key={link.name}
                     to={link.href}
-                    className={`text-sm font-medium transition-colors focus:outline-none flex items-center gap-1.5 ${
+                    className={`px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-sm font-medium transition-all focus:outline-none flex items-center gap-1.5 whitespace-nowrap ${
                       isActive
-                        ? 'text-emerald-400 font-bold'
-                        : 'text-slate-300 hover:text-emerald-400'
+                        ? 'text-emerald-400 font-semibold bg-emerald-950/70 border border-emerald-800/50 shadow-xs'
+                        : 'text-slate-300 hover:text-emerald-300 hover:bg-emerald-950/40'
                     }`}
                   >
-                    {link.name === 'Certificates' && <Award className="w-3.5 h-3.5 text-emerald-400" />}
+                    {link.name === 'Certificates' && <Award className="w-3.5 h-3.5 text-emerald-400 shrink-0" />}
                     <span>{link.name}</span>
                   </Link>
                 );
               }
 
               const targetHref = isHomePage ? link.href : `/${link.href}`;
+              const isMission = link.name === 'Mission & Vision';
               return (
                 <a
                   key={link.name}
                   href={targetHref}
-                  className="text-sm font-medium text-slate-300 hover:text-emerald-400 transition-colors focus:outline-none focus:text-emerald-400"
+                  className="px-2.5 xl:px-3 py-1.5 rounded-lg text-xs xl:text-sm font-medium text-slate-300 hover:text-emerald-300 hover:bg-emerald-950/40 transition-all focus:outline-none focus:text-emerald-400 whitespace-nowrap"
                 >
-                  {link.name}
+                  {isMission ? (
+                    <>
+                      <span className="hidden xl:inline">Mission &amp; Vision</span>
+                      <span className="xl:hidden">Mission</span>
+                    </>
+                  ) : (
+                    link.name
+                  )}
                 </a>
               );
             })}
           </nav>
 
           {/* Right Action Buttons */}
-          <div className="hidden lg:flex items-center gap-3">
+          <div className="hidden lg:flex items-center gap-2 xl:gap-3 shrink-0">
             {user ? (
               <div className="flex items-center gap-2">
                 {hasAdminAccess && (
                   <Link
                     to="/admin"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#016533]/30 text-emerald-300 border border-emerald-500/40 hover:bg-[#016533]/50 transition-all"
+                    className="inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#016533]/30 text-emerald-300 border border-emerald-500/40 hover:bg-[#016533]/50 transition-all whitespace-nowrap"
                   >
-                    <Shield className="w-3.5 h-3.5" />
-                    Admin Panel
+                    <Shield className="w-3.5 h-3.5 shrink-0" />
+                    <span>Admin Panel</span>
                   </Link>
                 )}
                 <Link
                   to="/membership-status"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700 transition-all"
+                  className="inline-flex items-center gap-1.5 px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 bg-slate-800 border border-slate-700 hover:text-white hover:bg-slate-700 transition-all whitespace-nowrap"
                   title={user.email}
                 >
-                  <UserIcon className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="max-w-[120px] truncate">{profile?.full_name || 'My Application'}</span>
+                  <UserIcon className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span className="max-w-[100px] xl:max-w-[130px] truncate">{profile?.full_name || 'My Application'}</span>
                 </Link>
                 <button
                   onClick={() => signOut()}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all"
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-400 hover:bg-slate-800 transition-all cursor-pointer"
                   title="Sign Out"
                   aria-label="Sign Out"
                 >
-                  <LogOut className="w-4 h-4" />
+                  <LogOut className="w-4 h-4 shrink-0" />
                 </button>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Link
                   to="/login"
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all"
+                  className="px-2.5 xl:px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800/80 transition-all whitespace-nowrap"
                 >
                   Sign In
                 </Link>
                 <a
                   href="#membership"
-                  className="inline-flex items-center justify-center px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/40 transition-all transform hover:-translate-y-0.5"
+                  className="inline-flex items-center justify-center px-3 xl:px-4 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-[#016533] via-emerald-600 to-[#016533] hover:from-[#015229] hover:to-emerald-500 shadow-md shadow-emerald-950/40 transition-all transform hover:-translate-y-0.5 whitespace-nowrap"
                 >
-                  Apply for Membership
+                  <span className="hidden xl:inline">Apply for Membership</span>
+                  <span className="xl:hidden">Apply</span>
                 </a>
               </div>
             )}
           </div>
 
           {/* Mobile Menu Hamburger Button */}
-          <div className="flex lg:hidden items-center gap-2">
+          <div className="flex lg:hidden items-center gap-2 shrink-0">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-400 cursor-pointer"
               aria-label="Toggle navigation menu"
               aria-expanded={isOpen}
             >
